@@ -16,10 +16,18 @@
       <Content Include="nlog.config">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <Content Include="Assets\Shaders\*.*">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Assets\Shaders\" />
+      <Folder Include="Core\Events\" />
       <Folder Include="Core\Logging\" />
+      <Folder Include="Input\" />
+      <Folder Include="Rendering\Buffers\" />
+      <Folder Include="Rendering\" />
     </ItemGroup>
 
 </Project>

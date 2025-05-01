@@ -5,12 +5,21 @@ using Makina.Engine.Core.Events;
 using Makina.Engine.Input;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using System;
+using Makina.Engine.Rendering.Buffers;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace Makina.Engine;
 
 public class Application : IDisposable
 {
     private Window? _window;
+    
+    // Triangle Rendering Resources
+    private Shader? _shader;
+    private VertexArray? _vertexArray;
+    private VertexBuffer? _vertexBuffer;
+    private IndexBuffer? _indexBuffer;
 
     public Application()
     {
@@ -26,7 +35,7 @@ public class Application : IDisposable
         // Ensure window was created
         if (_window == null)
         {
-            Log.Error("Window failed to initialize.");
+            Log.Error("Window failed to initialize or required resources could not be created.");
             return;
         }
         
@@ -36,13 +45,13 @@ public class Application : IDisposable
         Log.Info("Entering main loop...");
         while (ShouldRun())
         {
-            // 1. Process native window events (pumps OS messages, triggers OpenTK callbacks like OnResize/OnClosing)
+            // 1. Process native window events
             _window.ProcessEvents(); 
             
-            // 2. Dispatch queued engine events (allows systems to react to events published in step 1 or previous frame)
+            // 2. Dispatch queued engine events
             EventManager.DispatchQueuedEvents();
 
-            // 3. Update application logic / game state
+            // 3. Update application logic
             Update();
             
             // 4. Render the scene
@@ -62,36 +71,65 @@ public class Application : IDisposable
 
     private void Initialize()
     { 
-        // Initialize subsystems (Window, Input, Renderer, etc.)
         Log.Info("Initializing subsystems...");
         try
         {
-            _window = new Window(); // Create the window
+            _window = new Window(); 
             Log.Info("Window created.");
             
-            Renderer.Init(); // Initialize Renderer AFTER window/context exists
+            Renderer.Init(); 
+            Log.Info("Renderer initialized.");
 
-            // Ensure window and renderer are valid before proceeding
-            if (_window == null)
-            {
-                Log.Fatal("Cannot continue without a valid window.");
-                // Potentially throw or handle more gracefully
-                return; 
-            }
+            // --- Setup Triangle --- 
+            Log.Info("Setting up triangle geometry...");
+
+            // 1. Define Vertices (Position only)
+            float[] vertices = {
+                // Position       
+                 0.0f,  0.5f, 0.0f, // Top center
+                -0.5f, -0.5f, 0.0f, // Bottom left
+                 0.5f, -0.5f, 0.0f  // Bottom right
+            };
+
+            // 2. Define Indices
+            uint[] indices = {
+                0, 1, 2
+            };
+
+            // 3. Create Shader
+            _shader = new Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
+
+            // 4. Create Buffers
+            _vertexBuffer = VertexBuffer.CreateWithData(vertices);
+            _indexBuffer = new IndexBuffer(indices);
+
+            // 5. Create Vertex Array and configure layout
+            _vertexArray = new VertexArray();
+            var layout = new VertexBufferLayout();
+            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // layout(location = 0) = vec3 position
+            
+            _vertexArray.AddVertexBuffer(_vertexBuffer, layout);
+            _vertexArray.SetIndexBuffer(_indexBuffer);
+            
+            // Unbind VAO after setup (good practice)
+            _vertexArray.Unbind(); 
+            _vertexBuffer.Unbind();
+            _indexBuffer.Unbind();
+            
+            Log.Info("Triangle geometry setup complete.");
+            // --- End Triangle Setup ---
 
             // Example: Renderer subscribing to resize events
             EventManager.Subscribe<WindowResizeEvent>(OnWindowResize); 
-
-            // TODO: Initialize other subsystems (InputManager, etc.)
 
             Log.Info("Core systems initialized.");
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Exception during core system initialization");
-            // Ensure window is disposed if renderer init failed after window creation
-            _window?.Dispose(); 
-            _window = null; 
+            Log.Error(ex, "Exception during core system initialization or resource setup");
+            // Cleanup partially created resources
+            Shutdown(); // Call full shutdown to dispose anything created so far
+            _window = null; // Ensure window is null so Run() exits
         }
     }
 
@@ -152,19 +190,36 @@ public class Application : IDisposable
 
     private void Render()
     { 
-        // Render the scene
         Renderer.Clear(); // Clear the screen
         
-        // TODO: Add scene rendering logic here
+        // Draw the triangle if resources are valid
+        if (_shader != null && _vertexArray != null && _indexBuffer != null)
+        {
+            _shader.Use();
+            _vertexArray.Bind();
+            
+            GL.DrawElements(PrimitiveType.Triangles, _indexBuffer.Count, DrawElementsType.UnsignedInt, 0);
+            
+            _vertexArray.Unbind(); // Unbind VAO after drawing
+        }
     }
 
     private void Shutdown()
     { 
-        // Cleanup resources
-        Log.Info("Shutting down subsystems...");
-        // Dispose window last, as other systems might depend on it
+        Log.Info("Shutting down subsystems and disposing resources...");
+        
+        // Dispose rendering resources first (reverse order of creation is often safe)
+        _indexBuffer?.Dispose();
+        _vertexBuffer?.Dispose();
+        _vertexArray?.Dispose(); // VAO doesn't own buffers, dispose it after
+        _shader?.Dispose();
+        Log.Info("Rendering resources disposed.");
+
+        // Dispose window 
         _window?.Dispose();
         Log.Info("Window disposed.");
+        
+        // Shutdown logger last
         LogManager.Shutdown();
     }
 
