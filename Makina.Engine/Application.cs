@@ -15,6 +15,8 @@ using Makina.Engine.Scene; // Added
 using System.Collections.Generic; // Added for List
 using Makina.Engine.Debugging; // Added
 using ImGuiNET; // Added
+using Makina.Engine.Scene.Components; // <<< Added
+using System.Linq;                  // <<< Added for LINQ in Shutdown
 
 namespace Makina.Engine;
 
@@ -98,14 +100,13 @@ public class Application : IDisposable
     }
 
     private void Initialize()
-    { 
+    {
         Log.Info("Initializing subsystems...");
         try
-        {
-            _window = new Window(); 
+        { 
+            _window = new Window();
             Log.Info("Window created.");
             
-            // Capture mouse cursor for FPS controls
             _window.CursorState = CursorState.Grabbed;
             Log.Info("Cursor state set to Grabbed.");
             
@@ -113,15 +114,14 @@ public class Application : IDisposable
             _camera = new PerspectiveCamera(new Vector3(0.0f, 0.0f, 3.0f), aspectRatio);
             Log.Info("Camera created.");
             
-            Renderer.Init(); 
+            Renderer.Init();
             Log.Info("Renderer initialized.");
 
-            // --- Initialize ImGui Controller ---
             _imGuiController = new ImGuiController(_window.Size.X, _window.Size.Y);
             Log.Info("ImGui Controller initialized.");
 
-            // --- Create Game Object --- 
-            Log.Info("Creating game objects...");
+            // --- Create Game Objects with Components --- 
+            Log.Info("Creating game objects and components...");
 
             // 1. Load shared resources
             var shader = new Makina.Engine.Rendering.Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
@@ -136,21 +136,22 @@ public class Application : IDisposable
 
             // 2. Create First GameObject (Rotating)
             var triangleObject1 = new GameObject("RotatingTriangle");
-            triangleObject1.Mesh = mesh;
-            triangleObject1.Texture = texture;
-            triangleObject1.Shader = shader;
+            // Add MeshRenderer component and assign resources
+            var meshRenderer1 = new MeshRenderer { Mesh = mesh, Texture = texture, Shader = shader };
+            triangleObject1.AddComponent(meshRenderer1);
             _gameObjects.Add(triangleObject1);
-            Log.Info("First game object created.");
+            Log.Info("First game object created with MeshRenderer.");
             
             // 3. Create Second GameObject (Static Offset)
             var triangleObject2 = new GameObject("StaticTriangle");
-            triangleObject2.Mesh = mesh;     // Reuse same mesh
-            triangleObject2.Texture = texture; // Reuse same texture
-            triangleObject2.Shader = shader;  // Reuse same shader
-            triangleObject2.Transform.Position = new Vector3(1.5f, 0.0f, 0.0f); // Offset to the right
-            triangleObject2.Transform.Scale = new Vector3(0.75f); // Make it slightly smaller
+            // Add MeshRenderer component, reusing the same resources
+            var meshRenderer2 = new MeshRenderer { Mesh = mesh, Texture = texture, Shader = shader };
+            triangleObject2.AddComponent(meshRenderer2);
+            // Modify Transform (already exists on GameObject)
+            triangleObject2.Transform.Position = new Vector3(1.5f, 0.0f, 0.0f); 
+            triangleObject2.Transform.Scale = new Vector3(0.75f); 
             _gameObjects.Add(triangleObject2);
-            Log.Info("Second game object created at offset.");
+            Log.Info("Second game object created with MeshRenderer at offset.");
             
             // --- End Game Object Setup ---
 
@@ -308,44 +309,63 @@ public class Application : IDisposable
         // Loop through GameObjects and render them
         foreach (var gameObject in _gameObjects)
         {
-            // Temporary direct component access
-            if (gameObject.Shader != null && gameObject.Mesh != null && gameObject.Texture != null)
+            if (!gameObject.IsActive) continue; // Skip inactive GameObjects
+
+            // TryGetComponent is slightly more efficient if component might be missing
+            if (gameObject.TryGetComponent<MeshRenderer>(out var renderer) && 
+                renderer.Shader != null && renderer.Mesh != null && renderer.Texture != null)
             {
-                gameObject.Shader.Use();
+                renderer.Shader.Use();
                 
                 // Bind Texture
-                gameObject.Texture.Bind(TextureUnit.Texture0);
-                gameObject.Shader.SetUniformInt("uTexture", 0); 
+                renderer.Texture.Bind(TextureUnit.Texture0);
+                renderer.Shader.SetUniformInt("uTexture", 0); 
                 
                 // Set Uniforms (using GameObject's Transform)
-                gameObject.Shader.SetUniformMat4("uModel", gameObject.Transform.GetLocalMatrix());
-                gameObject.Shader.SetUniformMat4("uView", _camera.ViewMatrix);
-                gameObject.Shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
+                renderer.Shader.SetUniformMat4("uModel", gameObject.Transform.GetLocalMatrix());
+                renderer.Shader.SetUniformMat4("uView", _camera.ViewMatrix);
+                renderer.Shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
                 
                 // Draw Mesh
-                gameObject.Mesh.Bind(); 
-                GL.DrawElements(PrimitiveType.Triangles, gameObject.Mesh.IndexCount, DrawElementsType.UnsignedInt, 0);
-                gameObject.Mesh.Unbind();
+                renderer.Mesh.Bind(); 
+                GL.DrawElements(PrimitiveType.Triangles, renderer.Mesh.IndexCount, DrawElementsType.UnsignedInt, 0);
+                renderer.Mesh.Unbind();
             }
         }
     }
 
     private void Shutdown()
-    { 
+    {
         Log.Info("Shutting down subsystems and disposing resources...");
         
-        _imGuiController?.Dispose(); // Dispose ImGui Controller
+        _imGuiController?.Dispose();
         
-        // Dispose resources held by GameObjects (assuming they are owned here for now)
-        // In a real scenario, resource management would be more sophisticated.
+        // Dispose unique resources used by MeshRenderers
+        var uniqueMeshes = new HashSet<Mesh>();
+        var uniqueTextures = new HashSet<Texture>();
+        var uniqueShaders = new HashSet<Rendering.Shader>();
+
         foreach (var go in _gameObjects)
-        {
-            go.Mesh?.Dispose();
-            go.Texture?.Dispose();
-            go.Shader?.Dispose();
+        { 
+            if(go.TryGetComponent<MeshRenderer>(out var renderer))
+            {
+                if (renderer.Mesh != null) uniqueMeshes.Add(renderer.Mesh);
+                if (renderer.Texture != null) uniqueTextures.Add(renderer.Texture);
+                if (renderer.Shader != null) uniqueShaders.Add(renderer.Shader);
+            }
         }
+        
+        Log.Info($"Disposing {uniqueMeshes.Count} unique Meshes...");
+        foreach (var mesh in uniqueMeshes) mesh.Dispose();
+        
+        Log.Info($"Disposing {uniqueTextures.Count} unique Textures...");
+        foreach (var texture in uniqueTextures) texture.Dispose();
+        
+        Log.Info($"Disposing {uniqueShaders.Count} unique Shaders...");
+        foreach (var shader in uniqueShaders) shader.Dispose();
+
         _gameObjects.Clear();
-        Log.Info("Game object resources disposed.");
+        Log.Info("Game objects cleared.");
 
         _window?.Dispose();
         Log.Info("Window disposed.");

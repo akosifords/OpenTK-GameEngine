@@ -1,11 +1,13 @@
 using OpenTK.Mathematics;
+using System;
+using Makina.Engine.Scene.Components;
 
 namespace Makina.Engine.Scene;
 
 /// <summary>
 /// Represents the position, rotation, and scale of a GameObject in 3D space.
 /// </summary>
-public class Transform
+public class Transform : Component
 {
     private Vector3 _position = Vector3.Zero;
     private Quaternion _rotation = Quaternion.Identity;
