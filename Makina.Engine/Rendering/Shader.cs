@@ -169,6 +169,16 @@ public class Shader : IDisposable
         }
     }
 
+    public void SetUniformFloat(string name, float value)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(Shader));
+        int location = GetUniformLocation(name);
+        if (location != -1)
+        {
+            GL.Uniform1(location, value); // Use GL.Uniform1 for single float
+        }
+    }
+
     // TODO: Add SetUniformFloat, SetUniformVec3, etc.
 
     public void Dispose()

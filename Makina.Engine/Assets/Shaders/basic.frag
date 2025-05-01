@@ -16,6 +16,7 @@ uniform vec3 objectColor;   // <<< Added: Base color of the object
 uniform vec3 lightColor;    // <<< Added: Color of the light source
 uniform vec3 lightDir;      // <<< Added: Normalized direction *towards* the light
 uniform vec3 viewPos;       // <<< Added: Camera's world position
+uniform float shininess;    // <<< Added: Material shininess factor
 
 void main()
 {
@@ -31,11 +32,11 @@ void main()
     float diff = max(dot(norm, lightDir), 0.0); // Lambertian factor
     vec3 diffuse = diff * lightColor;
     
-    // Specular (Basic Phong - Optional for now)
+    // Specular (Basic Phong)
     float specularStrength = 0.5; // How strong the specular highlight is
     vec3 viewDir = normalize(viewPos - FragPos); // Direction from fragment to viewer
     vec3 lightReflectDir = reflect(-lightDir, norm); // Direction light reflects off the surface
-    float spec = pow(max(dot(viewDir, lightReflectDir), 0.0), 32); // Shininess factor (32 is moderate)
+    float spec = pow(max(dot(viewDir, lightReflectDir), 0.0), shininess); // <<< Use shininess uniform
     vec3 specular = specularStrength * spec * lightColor; // Calculate specular color component
     
     // Combine results

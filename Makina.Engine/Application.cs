@@ -142,18 +142,25 @@ public class Application : IDisposable
             layout.AddElement(3, 3, VertexAttribPointerType.Float, false); // Normal (location 3)
             var mesh = new Mesh(vertices, indices, layout);
 
+            // Create a shared Material instance
+            var basicMaterial = new Material(shader, texture)
+            {
+                 Color = new Vector3(1.0f, 0.5f, 0.31f) // Set base color here (coral)
+                 // Shininess is default 32.0f
+            };
+
             // 2. Create First GameObject (Rotating)
             var triangleObject1 = new GameObject("RotatingTriangle");
-            // Add MeshRenderer component and assign resources
-            var meshRenderer1 = new MeshRenderer { Mesh = mesh, Texture = texture, Shader = shader };
+            // Add MeshRenderer component and assign the material
+            var meshRenderer1 = new MeshRenderer { Mesh = mesh, Material = basicMaterial }; // <<< Use Material
             triangleObject1.AddComponent(meshRenderer1);
             _gameObjects.Add(triangleObject1);
             Log.Info("First game object created with MeshRenderer.");
             
             // 3. Create Second GameObject (Static Offset, Child of First)
             var triangleObject2 = new GameObject("ChildTriangle"); // Renamed for clarity
-            // Add MeshRenderer component, reusing the same resources
-            var meshRenderer2 = new MeshRenderer { Mesh = mesh, Texture = texture, Shader = shader };
+            // Add MeshRenderer component, reusing the same material
+            var meshRenderer2 = new MeshRenderer { Mesh = mesh, Material = basicMaterial }; // <<< Use Material
             triangleObject2.AddComponent(meshRenderer2);
             // Set local transform relative to parent
             triangleObject2.Transform.LocalPosition = new Vector3(1.5f, 0.0f, 0.0f); // Offset from parent
@@ -455,12 +462,28 @@ public class Application : IDisposable
                        // --- Display MeshRenderer Details (Read-only for now) ---
                        else if (component is MeshRenderer renderer)
                        {
+                            // Get details from the Material
                             string meshName = renderer.Mesh?.GetHashCode().ToString() ?? "None"; // Placeholder ID
-                            string textureName = renderer.Texture?.Handle.ToString() ?? "None";
-                            string shaderName = renderer.Shader?.Handle.ToString() ?? "None";
+                            string textureName = renderer.Material?.Texture?.Handle.ToString() ?? "None";
+                            string shaderName = renderer.Material?.Shader?.Handle.ToString() ?? "None";
                             ImGui.TextDisabled($"Mesh: {meshName}");
                             ImGui.TextDisabled($"Texture: {textureName}");
                             ImGui.TextDisabled($"Shader: {shaderName}");
+                            // Add Material properties display
+                            if (renderer.Material != null)
+                            {
+                                ImGui.Separator();
+                                System.Numerics.Vector3 matColor = ToSystemVec3(renderer.Material.Color);
+                                if (ImGui.ColorEdit3("Material Color", ref matColor))
+                                {
+                                    renderer.Material.Color = ToOpenTKVec3(matColor);
+                                }
+                                float shininess = renderer.Material.Shininess;
+                                if (ImGui.DragFloat("Material Shininess", ref shininess, 0.5f, 1.0f, 256.0f))
+                                {
+                                     renderer.Material.Shininess = shininess;
+                                }
+                            }
                        }
                        // Add more component types here...
                        else 
@@ -524,40 +547,43 @@ public class Application : IDisposable
 
         // --- Get Camera Position --- 
         Vector3 cameraPosition = _camera.Position;
-        // Remove hardcoded object color, maybe make it a component property later
-        Vector3 objectBaseColor = new Vector3(1.0f, 0.5f, 0.31f); 
+        // Removed hardcoded object color, now comes from Material
+        // Vector3 objectBaseColor = new Vector3(1.0f, 0.5f, 0.31f); 
 
         // Loop through GameObjects and render them
         foreach (var gameObject in _gameObjects)
         {
-            // Skip rendering the light source itself if it doesn't have a MeshRenderer
-            if (!gameObject.TryGetComponent<MeshRenderer>(out _)) continue; // Use TryGetComponent instead of HasComponent
+            // Skip rendering if it doesn't have a MeshRenderer
+            if (!gameObject.TryGetComponent<MeshRenderer>(out var renderer)) continue;
             
             if (!gameObject.IsActive) continue; // Skip inactive GameObjects
 
-            // TryGetComponent is slightly more efficient if component might be missing
-            if (gameObject.TryGetComponent<MeshRenderer>(out var renderer) && 
-                renderer.Shader != null && renderer.Mesh != null) 
+            // Check if MeshRenderer has valid Mesh and Material with Shader
+            if (renderer.Mesh != null && renderer.Material != null && renderer.Material.Shader != null) 
             {
-                renderer.Shader.Use();
+                Makina.Engine.Rendering.Shader shader = renderer.Material.Shader;
+                Texture? texture = renderer.Material.Texture; // Can be null
                 
-                // Bind Texture (Still useful if shader uses it, e.g., for modulation)
-                if (renderer.Texture != null) 
+                shader.Use();
+                
+                // Bind Texture if it exists
+                if (texture != null) 
                 {
-                    renderer.Texture.Bind(TextureUnit.Texture0);
-                    renderer.Shader.SetUniformInt("uTexture", 0); 
+                    texture.Bind(TextureUnit.Texture0);
+                    shader.SetUniformInt("uTexture", 0); 
                 }
                 
                 // Set Transformation Uniforms (using GameObject's Transform)
-                renderer.Shader.SetUniformMat4("uModel", gameObject.Transform.GetWorldMatrix());
-                renderer.Shader.SetUniformMat4("uView", _camera.ViewMatrix);
-                renderer.Shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
+                shader.SetUniformMat4("uModel", gameObject.Transform.GetWorldMatrix());
+                shader.SetUniformMat4("uView", _camera.ViewMatrix);
+                shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
                 
-                // --- Set Lighting Uniforms ---
-                renderer.Shader.SetUniformVec3("objectColor", objectBaseColor); // Still hardcoded base color
-                renderer.Shader.SetUniformVec3("lightColor", currentLightColor); // Use color from scene light
-                renderer.Shader.SetUniformVec3("lightDir", currentLightDir);     // Use direction from scene light
-                renderer.Shader.SetUniformVec3("viewPos", cameraPosition);
+                // --- Set Lighting & Material Uniforms ---
+                shader.SetUniformVec3("objectColor", renderer.Material.Color); // Use color from Material
+                shader.SetUniformFloat("shininess", renderer.Material.Shininess); // <<< Add Shininess uniform
+                shader.SetUniformVec3("lightColor", currentLightColor); // Use color from scene light
+                shader.SetUniformVec3("lightDir", currentLightDir);     // Use direction from scene light
+                shader.SetUniformVec3("viewPos", cameraPosition);
                 
                 // Draw Mesh
                 renderer.Mesh.Bind(); 
@@ -575,16 +601,24 @@ public class Application : IDisposable
         
         // Dispose unique resources used by MeshRenderers
         var uniqueMeshes = new HashSet<Mesh>();
+        // <<< Get unique Textures and Shaders from Materials >>>
         var uniqueTextures = new HashSet<Texture>();
         var uniqueShaders = new HashSet<Rendering.Shader>();
+        var uniqueMaterials = new HashSet<Material>(); // Keep track to avoid duplicate checks
 
         foreach (var go in _gameObjects)
         { 
             if(go.TryGetComponent<MeshRenderer>(out var renderer))
             {
                 if (renderer.Mesh != null) uniqueMeshes.Add(renderer.Mesh);
-                if (renderer.Texture != null) uniqueTextures.Add(renderer.Texture);
-                if (renderer.Shader != null) uniqueShaders.Add(renderer.Shader);
+                // Add Material components
+                if (renderer.Material != null && uniqueMaterials.Add(renderer.Material))
+                {
+                     if (renderer.Material.Texture != null) uniqueTextures.Add(renderer.Material.Texture);
+                     if (renderer.Material.Shader != null) uniqueShaders.Add(renderer.Material.Shader);
+                     // Optionally dispose the material itself if it becomes disposable
+                     // renderer.Material.Dispose(); 
+                }
             }
         }
         
