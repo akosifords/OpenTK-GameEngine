@@ -28,6 +28,13 @@ public class Window : IDisposable
 
     public bool IsClosing { get; private set; } = false;
 
+    // Expose CursorState from the underlying GameWindow
+    public CursorState CursorState 
+    {
+        get => _nativeWindow.CursorState;
+        set => _nativeWindow.CursorState = value;
+    }
+
     public Window(string title = "Makina Engine", int width = 1280, int height = 720)
     {
         var gameWindowSettings = GameWindowSettings.Default;

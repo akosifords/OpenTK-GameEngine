@@ -20,7 +20,10 @@ public static class InputManager
     private static readonly HashSet<MouseButton> s_mouseButtonsPressedThisFrame = new();
     private static readonly HashSet<MouseButton> s_mouseButtonsReleasedThisFrame = new();
     private static Vector2 s_mousePosition;
+    private static Vector2 s_lastMousePosition; // Added for delta calculation
+    private static Vector2 s_mousePositionDelta; // Added
     private static Vector2 s_mouseScrollDelta;
+    private static bool s_firstMouseMovement = true; // Prevent large jump on first focus
 
     // --- Public Accessors ---
 
@@ -35,6 +38,7 @@ public static class InputManager
     public static Vector2 GetMousePosition() => s_mousePosition;
     public static float GetMouseX() => s_mousePosition.X;
     public static float GetMouseY() => s_mousePosition.Y;
+    public static Vector2 GetMousePositionDelta() => s_mousePositionDelta; // Added accessor
     public static Vector2 GetMouseScrollDelta() => s_mouseScrollDelta;
 
     // --- Internal Update Methods (Called by Window event handlers) ---
@@ -73,7 +77,15 @@ public static class InputManager
 
     internal static void SetMousePosition(Vector2 position)
     {
+        s_lastMousePosition = s_mousePosition; // Store previous position before updating
         s_mousePosition = position;
+        
+        // Prevent large delta jump the first time the window receives focus
+        if (s_firstMouseMovement)
+        {
+            s_lastMousePosition = s_mousePosition;
+            s_firstMouseMovement = false;
+        }
     }
 
     internal static void SetMouseScroll(Vector2 offset)
@@ -93,5 +105,16 @@ public static class InputManager
         s_mouseButtonsPressedThisFrame.Clear();
         s_mouseButtonsReleasedThisFrame.Clear();
         s_mouseScrollDelta = Vector2.Zero; // Reset scroll delta each frame
+        
+        // Calculate mouse delta AFTER processing events for the frame
+        s_mousePositionDelta = s_mousePosition - s_lastMousePosition;
+        // Important: Reset last position for the next frame's calculation AFTER calculating delta
+        s_lastMousePosition = s_mousePosition; 
+    }
+
+    // Optional: Method to reset the 'first movement' flag if window focus changes
+    internal static void OnFocusChanged(bool focused)
+    {
+        if (focused) s_firstMouseMovement = true;
     }
 } 

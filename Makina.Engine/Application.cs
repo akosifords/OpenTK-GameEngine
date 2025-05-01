@@ -8,6 +8,8 @@ using System;
 using Makina.Engine.Rendering.Buffers;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using System.Diagnostics; // Added for Stopwatch
+using OpenTK.Windowing.Common; // Added for CursorState enum
 
 namespace Makina.Engine;
 
@@ -21,6 +23,10 @@ public class Application : IDisposable
     private VertexArray? _vertexArray;
     private VertexBuffer? _vertexBuffer;
     private IndexBuffer? _indexBuffer;
+
+    // Timing
+    private readonly Stopwatch _timer = new Stopwatch();
+    private float _lastFrameTime = 0.0f;
 
     public Application()
     {
@@ -43,9 +49,19 @@ public class Application : IDisposable
         // Subscribe to events AFTER subsystems are initialized
         SubscribeToEvents();
 
+        // Start timer before main loop
+        _timer.Start();
+        _lastFrameTime = (float)_timer.Elapsed.TotalSeconds;
+
         Log.Info("Entering main loop...");
         while (ShouldRun())
         {
+            // Calculate delta time
+            float currentTime = (float)_timer.Elapsed.TotalSeconds;
+            float deltaTime = currentTime - _lastFrameTime;
+            _lastFrameTime = currentTime;
+            // Log.Trace($"DeltaTime: {deltaTime * 1000:F2}ms"); // Can be noisy
+
             // 1. Process native window events
             _window.ProcessEvents(); 
             
@@ -53,12 +69,12 @@ public class Application : IDisposable
             EventManager.DispatchQueuedEvents();
 
             // 3. Update application logic
-            Update();
+            Update(deltaTime);
             
             // 4. Render the scene
             Render();
             
-            // 5. Reset per-frame input state
+            // 5. Reset per-frame input state (and calculate mouse delta)
             InputManager.FrameReset();
 
             // 6. Swap buffers
@@ -77,6 +93,10 @@ public class Application : IDisposable
         {
             _window = new Window(); 
             Log.Info("Window created.");
+            
+            // Capture mouse cursor for FPS controls
+            _window.CursorState = CursorState.Grabbed;
+            Log.Info("Cursor state set to Grabbed.");
             
             float aspectRatio = (float)_window.Size.X / _window.Size.Y;
             _camera = new PerspectiveCamera(new Vector3(0.0f, 0.0f, 3.0f), aspectRatio);
@@ -178,25 +198,34 @@ public class Application : IDisposable
         return _window != null && !_window.IsClosing;
     }
 
-    private void Update()
+    private void Update(float deltaTime)
     { 
-        // --- Update Camera (Example: Simple rotation) ---
-        // TODO: Replace with actual camera controls based on input
-        if (_camera != null)
+        if (_camera == null || _window == null) return;
+
+        // --- Camera Keyboard Movement ---
+        if (InputManager.IsKeyDown(Keys.W)) _camera.ProcessKeyboard(Keys.W, deltaTime);
+        if (InputManager.IsKeyDown(Keys.S)) _camera.ProcessKeyboard(Keys.S, deltaTime);
+        if (InputManager.IsKeyDown(Keys.A)) _camera.ProcessKeyboard(Keys.A, deltaTime);
+        if (InputManager.IsKeyDown(Keys.D)) _camera.ProcessKeyboard(Keys.D, deltaTime);
+        // Optional Up/Down
+        // if (InputManager.IsKeyDown(Keys.Space)) _camera.ProcessKeyboard(Keys.Space, deltaTime);
+        // if (InputManager.IsKeyDown(Keys.LeftShift)) _camera.ProcessKeyboard(Keys.LeftShift, deltaTime);
+
+        // --- Camera Mouse Look ---
+        Vector2 mouseDelta = InputManager.GetMousePositionDelta();
+        // Only process if there was actual movement (avoids small drift when not moving)
+        if (mouseDelta.LengthSquared > 0.0001f) 
         {
-             // Example: Rotate camera position around Y axis (or move based on input)
-             // float time = (float)GLFW.GetTime();
-             // _camera.Position = new Vector3((float)Math.Sin(time) * 3.0f, 0.0f, (float)Math.Cos(time) * 3.0f);
+             _camera.ProcessMouseMovement(mouseDelta.X, mouseDelta.Y);
         }
 
         // --- Input Handling Example ---
         if (InputManager.IsKeyPressed(Keys.Escape))
         {
-            Log.Info("Escape key pressed, publishing WindowCloseEvent.");
-            EventManager.Publish(new WindowCloseEvent());
-            // Note: The actual closing happens because Window.IsClosing gets set
-            // when the event is published from OnClosing in Window.cs.
-            // This just demonstrates using InputManager.
+            // Toggle cursor grab instead of closing immediately
+             _window.CursorState = _window.CursorState == CursorState.Grabbed ? CursorState.Normal : CursorState.Grabbed;
+             Log.Info($"Toggled cursor state to: {_window.CursorState}");
+             // EventManager.Publish(new WindowCloseEvent()); // Don't close on Escape now
         }
         
         // You can also check for continuous key hold:
