@@ -10,6 +10,7 @@ using OpenTK.Mathematics;
 using System.Diagnostics; // Added for Stopwatch
 using OpenTK.Windowing.Common; // Added for CursorState enum
 using Makina.Engine.Core.Math; // Added
+using Makina.Engine.Rendering.Buffers; // Need this for VertexBufferLayout now
 
 namespace Makina.Engine;
 
@@ -27,6 +28,11 @@ public class Application : IDisposable
     private readonly Stopwatch _timer = new Stopwatch();
     private float _lastFrameTime = 0.0f;
 
+    // New resources for direct VAO/IBO setup
+    private VertexBuffer? _vertexBuffer;
+    private IndexBuffer? _indexBuffer;
+    private VertexArray? _vertexArray;
+
     public Application()
     {
         // Constructor: Basic setup
@@ -38,10 +44,11 @@ public class Application : IDisposable
         // Main engine loop
         Initialize();
         
-        // Ensure window was created
-        if (_window == null || _camera == null || _triangleMesh == null)
+        // Ensure window, camera, and rendering resources were created
+        // Check _vertexArray for now, since we are using direct setup temporarily
+        if (_window == null || _camera == null || _vertexArray == null) 
         {
-            Log.Error("Window, Camera or Mesh failed to initialize.");
+            Log.Error("Window, Camera or rendering resources failed to initialize."); // Adjusted message
             return;
         }
         
@@ -105,19 +112,44 @@ public class Application : IDisposable
             Log.Info("Renderer initialized.");
 
             // --- Setup Triangle --- 
-            Log.Info("Setting up triangle geometry...");
+            Log.Info("Setting up triangle geometry with colors...");
 
-            // 1. Define Vertices & Indices
-            float[] vertices = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
+            // 1. Define Vertices (Position + Color)
+            // Data is interleaved: X, Y, Z, R, G, B
+            float[] vertices = {
+                // Position         // Color        
+                 0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f, // Top center (Red)
+                -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f, // Bottom left (Green)
+                 0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f  // Bottom right (Blue)
+            };
+
+            // Indices remain the same
             uint[] indices = { 0, 1, 2 };
 
             // 2. Create Shader
             _shader = new Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
 
-            // 3. Create Mesh (encapsulates VBO/IBO/VAO)
-            _triangleMesh = new Mesh(vertices, indices); 
-            
-            Log.Info("Triangle geometry setup complete.");
+            // 3. Define Vertex Layout
+            var layout = new VertexBufferLayout();
+            // Position attribute (location = 0)
+            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); 
+            // Color attribute (location = 1)
+            layout.AddElement(1, 3, VertexAttribPointerType.Float, false); 
+
+            // 4. Create Mesh - Needs modification to accept layout
+            // For now, let's assume Mesh constructor handles this or 
+            // we need to modify Mesh class first.
+            // TEMPORARY: Create buffers/VAO here directly until Mesh is updated.
+            _vertexBuffer = VertexBuffer.CreateWithData(vertices);
+            _indexBuffer = new IndexBuffer(indices);
+            _vertexArray = new VertexArray(); // Using direct VAO for now
+            _vertexArray.AddVertexBuffer(_vertexBuffer, layout);
+            _vertexArray.SetIndexBuffer(_indexBuffer);
+            _vertexArray.Unbind(); 
+            _vertexBuffer.Unbind();
+            _indexBuffer.Unbind();
+            // _triangleMesh = new Mesh(vertices, indices, layout); // TODO: Update Mesh constructor
+            Log.Info("Triangle geometry setup complete (using direct VAO for now).");
             
             // Initialize Model Matrix
             _modelMatrix = Matrix4.Identity;
@@ -225,19 +257,19 @@ public class Application : IDisposable
 
     private void Render()
     { 
-        Renderer.Clear(); // Clear the screen
+        Renderer.Clear(); 
         
-        // Use Mesh for drawing
-        if (_shader != null && _triangleMesh != null && _camera != null)
+        // Render using direct VAO/IBO until Mesh is updated
+        if (_shader != null && _vertexArray != null && _indexBuffer != null && _camera != null)
         {
             _shader.Use();
             _shader.SetUniformMat4("uModel", _modelMatrix);
             _shader.SetUniformMat4("uView", _camera.ViewMatrix);
             _shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
             
-            _triangleMesh.Bind(); // Bind Mesh's VAO
-            GL.DrawElements(PrimitiveType.Triangles, _triangleMesh.IndexCount, DrawElementsType.UnsignedInt, 0);
-            _triangleMesh.Unbind(); // Unbind Mesh's VAO
+            _vertexArray.Bind(); // Bind VAO directly
+            GL.DrawElements(PrimitiveType.Triangles, _indexBuffer.Count, DrawElementsType.UnsignedInt, 0);
+            _vertexArray.Unbind(); 
         }
     }
 
@@ -245,15 +277,16 @@ public class Application : IDisposable
     { 
         Log.Info("Shutting down subsystems and disposing resources...");
         
-        _triangleMesh?.Dispose(); // Dispose Mesh
+        // Dispose direct buffers/VAO
+        _indexBuffer?.Dispose();
+        _vertexBuffer?.Dispose();
+        _vertexArray?.Dispose(); 
+        // _triangleMesh?.Dispose(); // Dispose Mesh when used
         _shader?.Dispose();
         Log.Info("Rendering resources disposed.");
 
-        // Dispose window 
         _window?.Dispose();
         Log.Info("Window disposed.");
-        
-        // Shutdown logger last
         LogManager.Shutdown();
     }
 

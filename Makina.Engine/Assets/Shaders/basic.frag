@@ -1,10 +1,12 @@
 #version 330 core
 
+in vec3 vColor; // Input color from vertex shader (interpolated)
+
 // Output color for the fragment
 out vec4 FragColor;
 
 void main()
 {
-    // Output a solid color (e.g., magenta)
-    FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+    // Use the interpolated vertex color
+    FragColor = vec4(vColor, 1.0);
 } 
