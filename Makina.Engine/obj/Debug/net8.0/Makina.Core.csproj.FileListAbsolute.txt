@@ -1,0 +1,11 @@
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\bin\Debug\net8.0\Makina.Core.deps.json
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\bin\Debug\net8.0\Makina.Core.dll
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\bin\Debug\net8.0\Makina.Core.pdb
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\Makina.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\Makina.Core.AssemblyInfoInputs.cache
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\Makina.Core.AssemblyInfo.cs
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\Makina.Core.csproj.CoreCompileInputs.cache
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\Makina.Core.dll
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\refint\Makina.Core.dll
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\Makina.Core.pdb
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Core\obj\Debug\net8.0\ref\Makina.Core.dll

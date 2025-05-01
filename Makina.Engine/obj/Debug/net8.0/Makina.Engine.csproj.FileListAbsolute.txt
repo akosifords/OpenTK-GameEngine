@@ -1,0 +1,12 @@
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\bin\Debug\net8.0\Makina.Engine.deps.json
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\bin\Debug\net8.0\Makina.Engine.dll
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\bin\Debug\net8.0\Makina.Engine.pdb
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.csproj.AssemblyReference.cache
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.AssemblyInfoInputs.cache
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.AssemblyInfo.cs
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.csproj.CoreCompileInputs.cache
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.dll
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\refint\Makina.Engine.dll
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.pdb
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\ref\Makina.Engine.dll
