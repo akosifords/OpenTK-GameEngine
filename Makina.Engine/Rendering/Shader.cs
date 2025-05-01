@@ -58,6 +58,28 @@ public class Shader : IDisposable
         GL.DeleteShader(vertexShader);
     }
 
+    /// <summary>
+    /// Creates a shader program directly from source code strings.
+    /// Used for internally defined shaders like ImGui's.
+    /// </summary>
+    public Shader(string internalName, string vertexSource, string fragmentSource)
+    {
+        int vertexShader = CompileShader(ShaderType.VertexShader, vertexSource);
+        int fragmentShader = CompileShader(ShaderType.FragmentShader, fragmentSource);
+
+        Handle = GL.CreateProgram();
+        Log.Trace($"Created shader program '{internalName}' (Handle: {Handle}) from source");
+
+        GL.AttachShader(Handle, vertexShader);
+        GL.AttachShader(Handle, fragmentShader);
+        LinkProgram(Handle);
+
+        GL.DetachShader(Handle, vertexShader);
+        GL.DetachShader(Handle, fragmentShader);
+        GL.DeleteShader(fragmentShader);
+        GL.DeleteShader(vertexShader);
+    }
+
     private int CompileShader(ShaderType type, string source)
     {
         int shader = GL.CreateShader(type);

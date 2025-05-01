@@ -27,12 +27,22 @@ public class ImGuiController : IDisposable
 
     private Texture _fontTexture;
 
-    private Shader _shader;
+    private Rendering.Shader _shader;
 
     private int _windowWidth;
     private int _windowHeight;
 
     private System.Numerics.Vector2 _scaleFactor = System.Numerics.Vector2.One;
+
+    // Cache Enum values to avoid allocation every frame
+    private static readonly Keys[] _allKeys = (Keys[])Enum.GetValues(typeof(Keys));
+    private static readonly Dictionary<Keys, ImGuiKey> _keyMapping = new Dictionary<Keys, ImGuiKey>();
+
+    static ImGuiController()
+    {
+        // Populate the key mapping dictionary once
+        PopulateKeyMapping();
+    }
 
     /// <summary>
     /// Constructs a new ImGui controller.
@@ -120,7 +130,7 @@ public class ImGuiController : IDisposable
                 outputColor = color * texture(in_fontTexture, texCoord);
             }";
 
-        _shader = new Shader("ImGui", VertexSource, FragmentSource);
+        _shader = new Rendering.Shader("ImGui", VertexSource, FragmentSource);
 
         GL.BindBuffer(BufferTarget.ArrayBuffer, _vertexBuffer);
         GL.EnableVertexAttribArray(0);
@@ -215,16 +225,17 @@ public class ImGuiController : IDisposable
         io.MouseWheel = MouseState.ScrollDelta.Y;
         io.MouseWheelH = MouseState.ScrollDelta.X;
 
-        foreach (Keys key in Enum.GetValues(typeof(Keys)))
+        // Use cached key array and mapping dictionary
+        foreach (Keys key in _allKeys) // Use cached array
         {   
             // Use AddKeyEvent instead of deprecated KeysDown
             if (key == Keys.Unknown) continue; 
-            ImGuiKey imguikey = ConvertToImGuiKey(key);
-            if(imguikey != ImGuiKey.None) // Only add if there's a valid mapping
+            // ImGuiKey imguikey = ConvertToImGuiKey(key); // No longer needed
+            if (_keyMapping.TryGetValue(key, out ImGuiKey imguikey) && imguikey != ImGuiKey.None) // Use dictionary lookup
             {
                  io.AddKeyEvent(imguikey, KeyboardState.IsKeyDown(key));
             }
-        }
+        } 
 
         foreach (var c in PressedChars)
         {
@@ -340,125 +351,125 @@ public class ImGuiController : IDisposable
         Log.Info("ImGuiController disposed.");
     }
 
-    // Helper to convert OpenTK Keys enum to ImGuiKey enum
-    private ImGuiKey ConvertToImGuiKey(Keys key)
+    // Helper to populate the key mapping dictionary
+    private static void PopulateKeyMapping()
     {
         // This covers most common keys, but might need expansion for less common ones
         // For non-mappable keys, it returns ImGuiKey.None
-        switch (key)
-        {
-            // Letters
-            case Keys.A: return ImGuiKey.A;
-            case Keys.B: return ImGuiKey.B;
-            case Keys.C: return ImGuiKey.C;
-            case Keys.D: return ImGuiKey.D;
-            case Keys.E: return ImGuiKey.E;
-            case Keys.F: return ImGuiKey.F;
-            case Keys.G: return ImGuiKey.G;
-            case Keys.H: return ImGuiKey.H;
-            case Keys.I: return ImGuiKey.I;
-            case Keys.J: return ImGuiKey.J;
-            case Keys.K: return ImGuiKey.K;
-            case Keys.L: return ImGuiKey.L;
-            case Keys.M: return ImGuiKey.M;
-            case Keys.N: return ImGuiKey.N;
-            case Keys.O: return ImGuiKey.O;
-            case Keys.P: return ImGuiKey.P;
-            case Keys.Q: return ImGuiKey.Q;
-            case Keys.R: return ImGuiKey.R;
-            case Keys.S: return ImGuiKey.S;
-            case Keys.T: return ImGuiKey.T;
-            case Keys.U: return ImGuiKey.U;
-            case Keys.V: return ImGuiKey.V;
-            case Keys.W: return ImGuiKey.W;
-            case Keys.X: return ImGuiKey.X;
-            case Keys.Y: return ImGuiKey.Y;
-            case Keys.Z: return ImGuiKey.Z;
-            // Numbers
-            case Keys.D0: return ImGuiKey._0;
-            case Keys.D1: return ImGuiKey._1;
-            case Keys.D2: return ImGuiKey._2;
-            case Keys.D3: return ImGuiKey._3;
-            case Keys.D4: return ImGuiKey._4;
-            case Keys.D5: return ImGuiKey._5;
-            case Keys.D6: return ImGuiKey._6;
-            case Keys.D7: return ImGuiKey._7;
-            case Keys.D8: return ImGuiKey._8;
-            case Keys.D9: return ImGuiKey._9;
-            // Function Keys
-            case Keys.F1: return ImGuiKey.F1;
-            case Keys.F2: return ImGuiKey.F2;
-            case Keys.F3: return ImGuiKey.F3;
-            case Keys.F4: return ImGuiKey.F4;
-            case Keys.F5: return ImGuiKey.F5;
-            case Keys.F6: return ImGuiKey.F6;
-            case Keys.F7: return ImGuiKey.F7;
-            case Keys.F8: return ImGuiKey.F8;
-            case Keys.F9: return ImGuiKey.F9;
-            case Keys.F10: return ImGuiKey.F10;
-            case Keys.F11: return ImGuiKey.F11;
-            case Keys.F12: return ImGuiKey.F12;
-            // Special Keys
-            case Keys.Tab: return ImGuiKey.Tab;
-            case Keys.Enter: return ImGuiKey.Enter;
-            case Keys.Escape: return ImGuiKey.Escape;
-            case Keys.Space: return ImGuiKey.Space;
-            case Keys.Backspace: return ImGuiKey.Backspace;
-            case Keys.Delete: return ImGuiKey.Delete;
-            case Keys.Insert: return ImGuiKey.Insert;
-            case Keys.Up: return ImGuiKey.UpArrow;
-            case Keys.Down: return ImGuiKey.DownArrow;
-            case Keys.Left: return ImGuiKey.LeftArrow;
-            case Keys.Right: return ImGuiKey.RightArrow;
-            case Keys.Home: return ImGuiKey.Home;
-            case Keys.End: return ImGuiKey.End;
-            case Keys.PageUp: return ImGuiKey.PageUp;
-            case Keys.PageDown: return ImGuiKey.PageDown;
-            case Keys.CapsLock: return ImGuiKey.CapsLock;
-            case Keys.ScrollLock: return ImGuiKey.ScrollLock;
-            case Keys.PrintScreen: return ImGuiKey.PrintScreen;
-            case Keys.Pause: return ImGuiKey.Pause;
-            // Modifiers (Handled separately by checking KeyboardState, but included for completeness if needed elsewhere)
-            case Keys.LeftShift: return ImGuiKey.ModShift; // Using ModKeys might be better via io.AddKeyEvent
-            case Keys.RightShift: return ImGuiKey.ModShift;
-            case Keys.LeftControl: return ImGuiKey.ModCtrl;
-            case Keys.RightControl: return ImGuiKey.ModCtrl;
-            case Keys.LeftAlt: return ImGuiKey.ModAlt;
-            case Keys.RightAlt: return ImGuiKey.ModAlt;
-            case Keys.LeftSuper: return ImGuiKey.ModSuper;
-            case Keys.RightSuper: return ImGuiKey.ModSuper;
-            // Keypad
-            case Keys.KeyPad0: return ImGuiKey.Keypad0;
-            case Keys.KeyPad1: return ImGuiKey.Keypad1;
-            case Keys.KeyPad2: return ImGuiKey.Keypad2;
-            case Keys.KeyPad3: return ImGuiKey.Keypad3;
-            case Keys.KeyPad4: return ImGuiKey.Keypad4;
-            case Keys.KeyPad5: return ImGuiKey.Keypad5;
-            case Keys.KeyPad6: return ImGuiKey.Keypad6;
-            case Keys.KeyPad7: return ImGuiKey.Keypad7;
-            case Keys.KeyPad8: return ImGuiKey.Keypad8;
-            case Keys.KeyPad9: return ImGuiKey.Keypad9;
-            case Keys.KeyPadDecimal: return ImGuiKey.KeypadDecimal;
-            case Keys.KeyPadDivide: return ImGuiKey.KeypadDivide;
-            case Keys.KeyPadMultiply: return ImGuiKey.KeypadMultiply;
-            case Keys.KeyPadSubtract: return ImGuiKey.KeypadSubtract;
-            case Keys.KeyPadAdd: return ImGuiKey.KeypadAdd;
-            case Keys.KeyPadEnter: return ImGuiKey.KeypadEnter;
-            // Punctuation (Example, add more as needed)
-            case Keys.Apostrophe: return ImGuiKey.Apostrophe;
-            case Keys.Comma: return ImGuiKey.Comma;
-            case Keys.Minus: return ImGuiKey.Minus;
-            case Keys.Period: return ImGuiKey.Period;
-            case Keys.Slash: return ImGuiKey.Slash;
-            case Keys.Semicolon: return ImGuiKey.Semicolon;
-            case Keys.Equal: return ImGuiKey.Equal;
-            case Keys.LeftBracket: return ImGuiKey.LeftBracket;
-            case Keys.Backslash: return ImGuiKey.Backslash;
-            case Keys.RightBracket: return ImGuiKey.RightBracket;
-            case Keys.GraveAccent: return ImGuiKey.GraveAccent;
+        _keyMapping.Clear(); // Ensure it's empty before populating
 
-            default: return ImGuiKey.None; // Indicate no mapping found
-        }
+        // Letters
+        _keyMapping[Keys.A] = ImGuiKey.A;
+        _keyMapping[Keys.B] = ImGuiKey.B;
+        _keyMapping[Keys.C] = ImGuiKey.C;
+        _keyMapping[Keys.D] = ImGuiKey.D;
+        _keyMapping[Keys.E] = ImGuiKey.E;
+        _keyMapping[Keys.F] = ImGuiKey.F;
+        _keyMapping[Keys.G] = ImGuiKey.G;
+        _keyMapping[Keys.H] = ImGuiKey.H;
+        _keyMapping[Keys.I] = ImGuiKey.I;
+        _keyMapping[Keys.J] = ImGuiKey.J;
+        _keyMapping[Keys.K] = ImGuiKey.K;
+        _keyMapping[Keys.L] = ImGuiKey.L;
+        _keyMapping[Keys.M] = ImGuiKey.M;
+        _keyMapping[Keys.N] = ImGuiKey.N;
+        _keyMapping[Keys.O] = ImGuiKey.O;
+        _keyMapping[Keys.P] = ImGuiKey.P;
+        _keyMapping[Keys.Q] = ImGuiKey.Q;
+        _keyMapping[Keys.R] = ImGuiKey.R;
+        _keyMapping[Keys.S] = ImGuiKey.S;
+        _keyMapping[Keys.T] = ImGuiKey.T;
+        _keyMapping[Keys.U] = ImGuiKey.U;
+        _keyMapping[Keys.V] = ImGuiKey.V;
+        _keyMapping[Keys.W] = ImGuiKey.W;
+        _keyMapping[Keys.X] = ImGuiKey.X;
+        _keyMapping[Keys.Y] = ImGuiKey.Y;
+        _keyMapping[Keys.Z] = ImGuiKey.Z;
+        // Numbers
+        _keyMapping[Keys.D0] = ImGuiKey._0;
+        _keyMapping[Keys.D1] = ImGuiKey._1;
+        _keyMapping[Keys.D2] = ImGuiKey._2;
+        _keyMapping[Keys.D3] = ImGuiKey._3;
+        _keyMapping[Keys.D4] = ImGuiKey._4;
+        _keyMapping[Keys.D5] = ImGuiKey._5;
+        _keyMapping[Keys.D6] = ImGuiKey._6;
+        _keyMapping[Keys.D7] = ImGuiKey._7;
+        _keyMapping[Keys.D8] = ImGuiKey._8;
+        _keyMapping[Keys.D9] = ImGuiKey._9;
+        // Function Keys
+        _keyMapping[Keys.F1] = ImGuiKey.F1;
+        _keyMapping[Keys.F2] = ImGuiKey.F2;
+        _keyMapping[Keys.F3] = ImGuiKey.F3;
+        _keyMapping[Keys.F4] = ImGuiKey.F4;
+        _keyMapping[Keys.F5] = ImGuiKey.F5;
+        _keyMapping[Keys.F6] = ImGuiKey.F6;
+        _keyMapping[Keys.F7] = ImGuiKey.F7;
+        _keyMapping[Keys.F8] = ImGuiKey.F8;
+        _keyMapping[Keys.F9] = ImGuiKey.F9;
+        _keyMapping[Keys.F10] = ImGuiKey.F10;
+        _keyMapping[Keys.F11] = ImGuiKey.F11;
+        _keyMapping[Keys.F12] = ImGuiKey.F12;
+        // Special Keys
+        _keyMapping[Keys.Tab] = ImGuiKey.Tab;
+        _keyMapping[Keys.Enter] = ImGuiKey.Enter;
+        _keyMapping[Keys.Escape] = ImGuiKey.Escape;
+        _keyMapping[Keys.Space] = ImGuiKey.Space;
+        _keyMapping[Keys.Backspace] = ImGuiKey.Backspace;
+        _keyMapping[Keys.Delete] = ImGuiKey.Delete;
+        _keyMapping[Keys.Insert] = ImGuiKey.Insert;
+        _keyMapping[Keys.Up] = ImGuiKey.UpArrow;
+        _keyMapping[Keys.Down] = ImGuiKey.DownArrow;
+        _keyMapping[Keys.Left] = ImGuiKey.LeftArrow;
+        _keyMapping[Keys.Right] = ImGuiKey.RightArrow;
+        _keyMapping[Keys.Home] = ImGuiKey.Home;
+        _keyMapping[Keys.End] = ImGuiKey.End;
+        _keyMapping[Keys.PageUp] = ImGuiKey.PageUp;
+        _keyMapping[Keys.PageDown] = ImGuiKey.PageDown;
+        _keyMapping[Keys.CapsLock] = ImGuiKey.CapsLock;
+        _keyMapping[Keys.ScrollLock] = ImGuiKey.ScrollLock;
+        _keyMapping[Keys.PrintScreen] = ImGuiKey.PrintScreen;
+        _keyMapping[Keys.Pause] = ImGuiKey.Pause;
+        // Modifiers (AddKeyEvent handles these implicitly via KeyCtrl, KeyShift etc flags)
+        _keyMapping[Keys.LeftShift] = ImGuiKey.ModShift; 
+        _keyMapping[Keys.RightShift] = ImGuiKey.ModShift;
+        _keyMapping[Keys.LeftControl] = ImGuiKey.ModCtrl;
+        _keyMapping[Keys.RightControl] = ImGuiKey.ModCtrl;
+        _keyMapping[Keys.LeftAlt] = ImGuiKey.ModAlt;
+        _keyMapping[Keys.RightAlt] = ImGuiKey.ModAlt;
+        _keyMapping[Keys.LeftSuper] = ImGuiKey.ModSuper;
+        _keyMapping[Keys.RightSuper] = ImGuiKey.ModSuper;
+        // Keypad
+        _keyMapping[Keys.KeyPad0] = ImGuiKey.Keypad0;
+        _keyMapping[Keys.KeyPad1] = ImGuiKey.Keypad1;
+        _keyMapping[Keys.KeyPad2] = ImGuiKey.Keypad2;
+        _keyMapping[Keys.KeyPad3] = ImGuiKey.Keypad3;
+        _keyMapping[Keys.KeyPad4] = ImGuiKey.Keypad4;
+        _keyMapping[Keys.KeyPad5] = ImGuiKey.Keypad5;
+        _keyMapping[Keys.KeyPad6] = ImGuiKey.Keypad6;
+        _keyMapping[Keys.KeyPad7] = ImGuiKey.Keypad7;
+        _keyMapping[Keys.KeyPad8] = ImGuiKey.Keypad8;
+        _keyMapping[Keys.KeyPad9] = ImGuiKey.Keypad9;
+        _keyMapping[Keys.KeyPadDecimal] = ImGuiKey.KeypadDecimal;
+        _keyMapping[Keys.KeyPadDivide] = ImGuiKey.KeypadDivide;
+        _keyMapping[Keys.KeyPadMultiply] = ImGuiKey.KeypadMultiply;
+        _keyMapping[Keys.KeyPadSubtract] = ImGuiKey.KeypadSubtract;
+        _keyMapping[Keys.KeyPadAdd] = ImGuiKey.KeypadAdd;
+        _keyMapping[Keys.KeyPadEnter] = ImGuiKey.KeypadEnter;
+        // Punctuation (Example, add more as needed)
+        _keyMapping[Keys.Apostrophe] = ImGuiKey.Apostrophe;
+        _keyMapping[Keys.Comma] = ImGuiKey.Comma;
+        _keyMapping[Keys.Minus] = ImGuiKey.Minus;
+        _keyMapping[Keys.Period] = ImGuiKey.Period;
+        _keyMapping[Keys.Slash] = ImGuiKey.Slash;
+        _keyMapping[Keys.Semicolon] = ImGuiKey.Semicolon;
+        _keyMapping[Keys.Equal] = ImGuiKey.Equal;
+        _keyMapping[Keys.LeftBracket] = ImGuiKey.LeftBracket;
+        _keyMapping[Keys.Backslash] = ImGuiKey.Backslash;
+        _keyMapping[Keys.RightBracket] = ImGuiKey.RightBracket;
+        _keyMapping[Keys.GraveAccent] = ImGuiKey.GraveAccent;
+
+        // Note: Some keys might not have direct mappings or might be handled differently (e.g., NumLock)
+        // We default to ImGuiKey.None if a mapping isn't found later.
     }
 }
 
