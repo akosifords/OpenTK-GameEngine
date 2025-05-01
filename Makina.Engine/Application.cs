@@ -10,6 +10,7 @@ using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using System.Diagnostics; // Added for Stopwatch
 using OpenTK.Windowing.Common; // Added for CursorState enum
+using Makina.Engine.Core.Math; // Added
 
 namespace Makina.Engine;
 
@@ -23,6 +24,7 @@ public class Application : IDisposable
     private VertexArray? _vertexArray;
     private VertexBuffer? _vertexBuffer;
     private IndexBuffer? _indexBuffer;
+    private Matrix4 _modelMatrix;
 
     // Timing
     private readonly Stopwatch _timer = new Stopwatch();
@@ -142,6 +144,10 @@ public class Application : IDisposable
             _indexBuffer.Unbind();
             
             Log.Info("Triangle geometry setup complete.");
+            
+            // Initialize Model Matrix
+            _modelMatrix = Matrix4.Identity;
+            Log.Info("Model matrix initialized to Identity.");
             // --- End Triangle Setup ---
 
             // Example: Renderer subscribing to resize events
@@ -201,6 +207,12 @@ public class Application : IDisposable
     private void Update(float deltaTime)
     { 
         if (_camera == null || _window == null) return;
+        
+        // --- Simple Model Rotation ---
+        float angle = (float)_timer.Elapsed.TotalSeconds * MathUtil.DegreesToRadians(30.0f); // Rotate 30 degrees per second
+        _modelMatrix = Matrix4.CreateRotationY(angle); 
+        // To add translation: _modelMatrix = Matrix4.CreateRotationY(angle) * Matrix4.CreateTranslation(x, y, z);
+        // Remember matrix multiplication order matters (usually scale -> rotate -> translate)
 
         // --- Camera Keyboard Movement ---
         if (InputManager.IsKeyDown(Keys.W)) _camera.ProcessKeyboard(Keys.W, deltaTime);
@@ -244,8 +256,7 @@ public class Application : IDisposable
             _shader.Use();
 
             // Set Uniforms
-            Matrix4 model = Matrix4.Identity; // No model transformation yet
-            _shader.SetUniformMat4("uModel", model);
+            _shader.SetUniformMat4("uModel", _modelMatrix);
             _shader.SetUniformMat4("uView", _camera.ViewMatrix);
             _shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
             
