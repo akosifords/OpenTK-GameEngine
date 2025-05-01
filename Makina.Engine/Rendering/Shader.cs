@@ -127,7 +127,17 @@ public class Shader : IDisposable
         }
     }
     
-    // TODO: Add SetUniformFloat, SetUniformVec3, SetUniformInt, etc.
+    public void SetUniformInt(string name, int value)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(Shader));
+        int location = GetUniformLocation(name);
+        if (location != -1)
+        {
+            GL.Uniform1(location, value);
+        }
+    }
+
+    // TODO: Add SetUniformFloat, SetUniformVec3, etc.
 
     public void Dispose()
     {

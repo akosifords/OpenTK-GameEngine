@@ -21,7 +21,8 @@ public class Application : IDisposable
     
     // Rendering Resources
     private Shader? _shader;
-    private Mesh? _triangleMesh; // Use Mesh field again
+    private Mesh? _triangleMesh;
+    private Texture? _texture;
     private Matrix4 _modelMatrix;
 
     // Timing
@@ -106,14 +107,16 @@ public class Application : IDisposable
             Renderer.Init(); 
             Log.Info("Renderer initialized.");
 
-            // --- Setup Triangle --- 
-            Log.Info("Setting up triangle geometry with colors...");
+            // --- Setup Textured Triangle --- 
+            Log.Info("Setting up textured triangle geometry...");
 
-            // 1. Define Vertices (Position + Color)
+            // 1. Define Vertices (Pos, Color, TexCoord)
+            // Color is still included but won't be used by the shader currently
             float[] vertices = {
-                 0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f, 
-                -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f, 
-                 0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f  
+                // Position         // Color          // TexCoords
+                 0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  0.5f, 1.0f, // Top center
+                -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f, // Bottom left
+                 0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f  // Bottom right
             };
             uint[] indices = { 0, 1, 2 };
 
@@ -122,17 +125,20 @@ public class Application : IDisposable
 
             // 3. Define Vertex Layout
             var layout = new VertexBufferLayout();
-            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // Position
-            layout.AddElement(1, 3, VertexAttribPointerType.Float, false); // Color
+            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // Position (vec3)
+            layout.AddElement(1, 3, VertexAttribPointerType.Float, false); // Color (vec3)
+            layout.AddElement(2, 2, VertexAttribPointerType.Float, false); // TexCoord (vec2)
 
             // 4. Create Mesh using the layout
             _triangleMesh = new Mesh(vertices, indices, layout); 
             
-            Log.Info("Triangle geometry setup complete.");
+            // 5. Load Texture (Make sure you have a texture file here!)
+            _texture = new Texture("Assets/Textures/container.png"); // Example path
+            
+            Log.Info("Textured triangle geometry setup complete.");
             
             // Initialize Model Matrix
             _modelMatrix = Matrix4.Identity;
-            Log.Info("Model matrix initialized to Identity.");
             // --- End Triangle Setup ---
 
             // Example: Renderer subscribing to resize events
@@ -148,6 +154,7 @@ public class Application : IDisposable
             _window = null; // Ensure window is null so Run() exits
             _camera = null; // Ensure camera is also nulled on error
             _triangleMesh = null; // Null out mesh too
+            _texture = null; // Null out texture on error too
         }
     }
 
@@ -238,17 +245,25 @@ public class Application : IDisposable
     { 
         Renderer.Clear(); 
         
-        // Render using Mesh again
-        if (_shader != null && _triangleMesh != null && _camera != null)
+        if (_shader != null && _triangleMesh != null && _camera != null && _texture != null)
         {
             _shader.Use();
+
+            // Bind Texture to Texture Unit 0
+            _texture.Bind(TextureUnit.Texture0);
+            // Set the shader's texture uniform to use Texture Unit 0
+            _shader.SetUniformInt("uTexture", 0); 
+
             _shader.SetUniformMat4("uModel", _modelMatrix);
             _shader.SetUniformMat4("uView", _camera.ViewMatrix);
             _shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
             
-            _triangleMesh.Bind(); // Bind Mesh's VAO
+            _triangleMesh.Bind(); 
             GL.DrawElements(PrimitiveType.Triangles, _triangleMesh.IndexCount, DrawElementsType.UnsignedInt, 0);
             _triangleMesh.Unbind(); 
+            
+            // Optional: Unbind texture (usually not necessary)
+            // _texture.Unbind(); 
         }
     }
 
@@ -256,7 +271,7 @@ public class Application : IDisposable
     { 
         Log.Info("Shutting down subsystems and disposing resources...");
         
-        // Dispose Mesh (which disposes its buffers/VAO)
+        _texture?.Dispose(); // Dispose Texture
         _triangleMesh?.Dispose(); 
         _shader?.Dispose();
         Log.Info("Rendering resources disposed.");
