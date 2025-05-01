@@ -3,6 +3,7 @@ using OpenTK.Windowing.Common;
 using OpenTK.Mathematics; // For Vector2i
 using OpenTK.Windowing.GraphicsLibraryFramework; // Added for IBindingsContext
 using Makina.Engine.Core.Logging; // Added
+using OpenTK.Graphics.OpenGL4; // Added for GL calls
 
 namespace Makina.Engine;
 
@@ -63,8 +64,8 @@ public class Window : IDisposable
     private void OnResize(ResizeEventArgs args)
     {
         Log.Debug($"Window resized to: {args.Width}x{args.Height}");
-        // Need to set OpenGL viewport here if using OpenGL
-        // GL.Viewport(0, 0, args.Width, args.Height);
+        // Set OpenGL viewport when the window is resized
+        GL.Viewport(0, 0, args.Width, args.Height);
     }
 
     public void Dispose()

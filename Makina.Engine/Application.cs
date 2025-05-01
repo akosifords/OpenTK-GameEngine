@@ -1,5 +1,6 @@
 ﻿using Makina.Engine.Core.Logging;
 using NLog;
+using Makina.Engine.Rendering;
 
 namespace Makina.Engine;
 
@@ -50,12 +51,17 @@ public class Application : IDisposable
         {
             _window = new Window(); // Create the window
             Log.Info("Window created.");
-            // TODO: Initialize other subsystems (Renderer, InputManager, etc.)
+            
+            Renderer.Init(); // Initialize Renderer AFTER window/context exists
+
+            // TODO: Initialize other subsystems (InputManager, etc.)
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Exception during window initialization");
-            _window = null; // Ensure window is null if creation failed
+            Log.Error(ex, "Exception during core system initialization");
+            // Ensure window is disposed if renderer init failed after window creation
+            _window?.Dispose(); 
+            _window = null; 
         }
     }
 
@@ -75,8 +81,9 @@ public class Application : IDisposable
     private void Render()
     { 
         // Render the scene
-        // Example: Clear the screen (requires Renderer setup)
-        // Renderer.Clear(0.1f, 0.1f, 0.1f, 1.0f);
+        Renderer.Clear(); // Clear the screen
+        
+        // TODO: Add scene rendering logic here
     }
 
     private void Shutdown()
