@@ -42,10 +42,10 @@ void main()
     // Combine results
     vec3 result = (ambient + diffuse + specular) * objectColor; // <<< Added specular to the sum
     
-    // Option 1: Modulate texture color with lighting
+    // Option 1: Modulate texture color with lighting (Uncommented)
     FragColor = texture(uTexture, vTexCoord) * vec4(result, 1.0);
     
-    // Option 2: Use lighting on the object color, ignore texture for now
+    // Option 2: Use lighting on the object color, ignore texture for now (Commented out)
     // FragColor = vec4(result, 1.0);
     
     // Option 3: Modulate texture by diffuse+ambient (common)

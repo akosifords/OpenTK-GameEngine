@@ -18,6 +18,9 @@ using ImGuiNET; // Added
 using Makina.Engine.Scene.Components; // <<< Added
 using System.Linq;                  // <<< Added for LINQ in Shutdown
 using Makina.Engine.Core;           // <<< Added for ResourceManager
+using Makina.Engine.Physics; // Added
+using BepuPhysics; // Added for BodyReference, StaticReference etc.
+using BepuUtilities; // Added for RigidPose
 
 namespace Makina.Engine;
 
@@ -27,6 +30,7 @@ public class Application : IDisposable
     protected Window? _window;
     protected PerspectiveCamera? _camera;
     protected ImGuiController? _imGuiController;
+    protected PhysicsWorld? _physicsWorld; // Added
     protected List<GameObject> _gameObjects = new List<GameObject>();
     protected GameObject? _selectedGameObject = null;
     protected readonly Stopwatch _timer = new Stopwatch();
@@ -43,9 +47,9 @@ public class Application : IDisposable
     {
         Initialize();
         
-        if (_window == null || _camera == null || _imGuiController == null)
+        if (_window == null || _camera == null || _imGuiController == null || _physicsWorld == null)
         { 
-             Log.Error("Base engine systems (Window, Camera, ImGuiController) failed to initialize.");
+             Log.Error("One or more essential engine systems (Window, Camera, ImGuiController, PhysicsWorld) failed to initialize.");
              return;
         }
         
@@ -80,6 +84,7 @@ public class Application : IDisposable
     protected virtual void Initialize()
     {
         Log.Info("Initializing base engine subsystems...");
+        bool initializationOk = false;
         try
         { 
             _window = new Window(); 
@@ -89,7 +94,9 @@ public class Application : IDisposable
             _camera = new PerspectiveCamera(new Vector3(0.0f, 0.0f, 3.0f), aspectRatio);
             
             Renderer.Init();
+            GL.Enable(EnableCap.FramebufferSrgb);
             _imGuiController = new ImGuiController(_window.Size.X, _window.Size.Y);
+            _physicsWorld = new PhysicsWorld(); // Added initialization
 
             Log.Info("Base engine subsystems initialized.");
             
@@ -104,15 +111,25 @@ public class Application : IDisposable
             {
                  _window.TextInput += OnTextInput;
             }
+            initializationOk = true;
         }
         catch (Exception ex)
         { 
             Log.Error(ex, "Exception during engine initialization or content loading.");
-            Shutdown(); // Attempt cleanup
-            // Prevent Run() from continuing if base systems failed
-            _window = null; 
-            _camera = null; 
-            _imGuiController = null;
+        }
+        finally
+        { 
+             if (!initializationOk) 
+             { 
+                Log.Error("Engine initialization failed. Shutting down partially initialized systems.");
+                // Attempt cleanup even if initialization failed halfway
+                Shutdown(); 
+                // Nullify references to prevent Run() continuing with bad state
+                _window = null; 
+                _camera = null; 
+                _imGuiController = null;
+                _physicsWorld = null; // Added
+            }
         }
     }
 
@@ -171,13 +188,69 @@ public class Application : IDisposable
     protected virtual void Update(float deltaTime)
     { 
         // --- Build Debug UI --- 
-        BuildDebugUI(); // Keep generic debug UI in base class
+        BuildDebugUI();
         
         // --- Process Engine Input (Camera, etc.) ---
         ProcessEngineInput(deltaTime);
 
+        // --- Update Physics Simulation ---
+        UpdatePhysics(deltaTime); 
+
         // --- Update Application Scene Logic ---
+        // This now runs AFTER physics updates the transforms of dynamic objects
         UpdateScene(deltaTime); 
+    }
+
+    /// <summary>
+    /// Updates the physics simulation and synchronizes transforms.
+    /// </summary>
+    protected virtual void UpdatePhysics(float deltaTime)
+    { 
+        if (_physicsWorld == null) return;
+
+        // --- Pre-step: Update Kinematic Bodies --- 
+        // Apply GameObject transform changes to kinematic physics bodies
+        foreach (var go in _gameObjects)
+        {
+            var rb = go.GetComponent<RigidbodyComponent>();
+            if (rb != null && rb.IsInitialized && rb.BodyType == BodyType.Kinematic)
+            {
+                 if (_physicsWorld.Simulation.Bodies.GetBodyReference(rb.BodyHandle) is var bodyRef && bodyRef.Exists)
+                 { 
+                    // Convert GameObject transform to BEPU RigidPose
+                    // Note: This assumes direct mapping. Adjust if Transform component uses different conventions.
+                    var pose = new RigidPose(
+                        Vec3Conversion.ToSystemNumerics(go.Transform.Position), 
+                        QuatConversion.ToSystemNumerics(go.Transform.Rotation)
+                    );
+                    bodyRef.Pose = pose;
+                    // TODO: Set kinematic velocity if needed (e.g., based on transform change)
+                    // bodyRef.Velocity = ...
+                 }
+            }
+        }
+
+        // --- Step Simulation ---
+        _physicsWorld.Update(deltaTime);
+
+        // --- Post-step: Update GameObject Transforms --- 
+        // Update GameObject transforms based on dynamic physics bodies
+        foreach (var go in _gameObjects)
+        {
+            var rb = go.GetComponent<RigidbodyComponent>();
+            if (rb != null && rb.IsInitialized && rb.BodyType == BodyType.Dynamic)
+            {
+                 if (_physicsWorld.Simulation.Bodies.GetBodyReference(rb.BodyHandle) is var bodyRef && bodyRef.Exists) 
+                 {
+                    // Apply physics world pose directly to local transform
+                    // WARNING: This overrides parent influence for dynamic objects.
+                    // More complex hierarchy synchronization might be needed for nested physics objects.
+                    go.Transform.LocalPosition = Vec3Conversion.ToOpenTK(bodyRef.Pose.Position);
+                    go.Transform.LocalRotation = QuatConversion.ToOpenTK(bodyRef.Pose.Orientation);
+                 }
+            }
+            // Statics don't move, so no need to update their transforms from physics
+        }
     }
 
     /// <summary>
@@ -499,6 +572,7 @@ public class Application : IDisposable
 
         // Dispose core engine systems
         Log.Info("Disposing core engine systems...");
+        _physicsWorld?.Dispose(); // Added dispose
         _imGuiController?.Dispose();
         _window?.Dispose();
         Log.Info("Core engine systems disposed.");
@@ -521,5 +595,33 @@ public class Application : IDisposable
     {
         Shutdown();
         GC.SuppressFinalize(this);
+    }
+
+    // --- Helper Structs for Conversions --- 
+    // (Place these at the end of the Application class or in a separate utility file)
+    public static class Vec3Conversion
+    {
+        public static System.Numerics.Vector3 ToSystemNumerics(OpenTK.Mathematics.Vector3 v)
+        {
+            return new System.Numerics.Vector3(v.X, v.Y, v.Z);
+        }
+
+        public static OpenTK.Mathematics.Vector3 ToOpenTK(System.Numerics.Vector3 v)
+        {
+            return new OpenTK.Mathematics.Vector3(v.X, v.Y, v.Z);
+        }
+    }
+
+    public static class QuatConversion
+    {
+        public static System.Numerics.Quaternion ToSystemNumerics(OpenTK.Mathematics.Quaternion v)
+        {
+            return new System.Numerics.Quaternion(v.X, v.Y, v.Z, v.W);
+        }
+
+        public static OpenTK.Mathematics.Quaternion ToOpenTK(System.Numerics.Quaternion v)
+        {
+            return new OpenTK.Mathematics.Quaternion(v.X, v.Y, v.Z, v.W);
+        }
     }
 }

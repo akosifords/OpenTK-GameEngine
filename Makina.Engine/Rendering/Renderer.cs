@@ -21,7 +21,9 @@ public static class Renderer
             Log.Info($"Default clear color set to dark grey.");
 
             // TODO: Add other initial GL setup (depth testing, blending, etc.)
-            // GL.Enable(EnableCap.DepthTest);
+            GL.Enable(EnableCap.DepthTest);
+            GL.Enable(EnableCap.CullFace);
+            GL.CullFace(CullFaceMode.Back);
         }
         catch (Exception ex)
         {
@@ -33,7 +35,7 @@ public static class Renderer
     public static void Clear()
     {
         // Clear the color buffer
-        GL.Clear(ClearBufferMask.ColorBufferBit /* | ClearBufferMask.DepthBufferBit */);
+        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
     }
 
     // Optional: Add a method to be called on window resize

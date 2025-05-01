@@ -9,6 +9,10 @@ namespace Makina.Engine.Scene.Components
         // Optional lifecycle methods (can be added later if needed)
         // public virtual void Initialize() { }
         // public virtual void Update(float deltaTime) { }
-        // public virtual void Dispose() { } 
+        // public virtual void Dispose() { }
+
+        // Lifecycle methods
+        public virtual void OnCreate() { }
+        public virtual void OnDestroy() { }
     }
 } 
