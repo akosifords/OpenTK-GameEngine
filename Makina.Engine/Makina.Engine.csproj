@@ -30,12 +30,14 @@
 
     <ItemGroup>
       <Folder Include="Assets\Shaders\" />
+      <Folder Include="Assets\Textures\" />
       <Folder Include="Core\Events\" />
       <Folder Include="Core\Logging\" />
       <Folder Include="Core\Math\" />
       <Folder Include="Input\" />
       <Folder Include="Rendering\Buffers\" />
       <Folder Include="Rendering\" />
+      <Folder Include="Scene\" />
     </ItemGroup>
 
 </Project>

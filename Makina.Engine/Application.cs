@@ -11,6 +11,8 @@ using System.Diagnostics; // Added for Stopwatch
 using OpenTK.Windowing.Common; // Added for CursorState enum
 using Makina.Engine.Core.Math; // Added
 using Makina.Engine.Rendering.Buffers; // Keep for VertexBufferLayout
+using Makina.Engine.Scene; // Added
+using System.Collections.Generic; // Added for List
 
 namespace Makina.Engine;
 
@@ -19,11 +21,8 @@ public class Application : IDisposable
     private Window? _window;
     private PerspectiveCamera? _camera;
     
-    // Rendering Resources
-    private Shader? _shader;
-    private Mesh? _triangleMesh;
-    private Texture? _texture;
-    private Matrix4 _modelMatrix;
+    // Scene Management (very basic)
+    private List<GameObject> _gameObjects = new List<GameObject>();
 
     // Timing
     private readonly Stopwatch _timer = new Stopwatch();
@@ -42,9 +41,9 @@ public class Application : IDisposable
         
         // Ensure window, camera, and rendering resources were created
         // Check _triangleMesh for now, since we are using Mesh now
-        if (_window == null || _camera == null || _triangleMesh == null) 
+        if (_window == null || _camera == null)
         {
-            Log.Error("Window, Camera or Mesh failed to initialize.");
+            Log.Error("Window or Camera failed to initialize.");
             return;
         }
         
@@ -107,43 +106,41 @@ public class Application : IDisposable
             Renderer.Init(); 
             Log.Info("Renderer initialized.");
 
-            // --- Setup Textured Triangle --- 
-            Log.Info("Setting up textured triangle geometry...");
+            // --- Create Game Object --- 
+            Log.Info("Creating game objects...");
 
-            // 1. Define Vertices (Pos, Color, TexCoord)
-            // Color is still included but won't be used by the shader currently
-            float[] vertices = {
-                // Position         // Color          // TexCoords
-                 0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  0.5f, 1.0f, // Top center
-                -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f, // Bottom left
-                 0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f  // Bottom right
-            };
+            // 1. Load shared resources
+            var shader = new Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
+            var texture = new Texture("Assets/Textures/container.png");
+            float[] vertices = { 0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  0.5f, 1.0f, -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f, 0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f };
             uint[] indices = { 0, 1, 2 };
-
-            // 2. Create Shader
-            _shader = new Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
-
-            // 3. Define Vertex Layout
             var layout = new VertexBufferLayout();
-            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // Position (vec3)
-            layout.AddElement(1, 3, VertexAttribPointerType.Float, false); // Color (vec3)
-            layout.AddElement(2, 2, VertexAttribPointerType.Float, false); // TexCoord (vec2)
+            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // Position
+            layout.AddElement(1, 3, VertexAttribPointerType.Float, false); // Color (unused by shader)
+            layout.AddElement(2, 2, VertexAttribPointerType.Float, false); // TexCoord
+            var mesh = new Mesh(vertices, indices, layout);
 
-            // 4. Create Mesh using the layout
-            _triangleMesh = new Mesh(vertices, indices, layout); 
+            // 2. Create First GameObject (Rotating)
+            var triangleObject1 = new GameObject("RotatingTriangle");
+            triangleObject1.Mesh = mesh;
+            triangleObject1.Texture = texture;
+            triangleObject1.Shader = shader;
+            _gameObjects.Add(triangleObject1);
+            Log.Info("First game object created.");
             
-            // 5. Load Texture (Make sure you have a texture file here!)
-            _texture = new Texture("Assets/Textures/container.png"); // Example path
+            // 3. Create Second GameObject (Static Offset)
+            var triangleObject2 = new GameObject("StaticTriangle");
+            triangleObject2.Mesh = mesh;     // Reuse same mesh
+            triangleObject2.Texture = texture; // Reuse same texture
+            triangleObject2.Shader = shader;  // Reuse same shader
+            triangleObject2.Transform.Position = new Vector3(1.5f, 0.0f, 0.0f); // Offset to the right
+            triangleObject2.Transform.Scale = new Vector3(0.75f); // Make it slightly smaller
+            _gameObjects.Add(triangleObject2);
+            Log.Info("Second game object created at offset.");
             
-            Log.Info("Textured triangle geometry setup complete.");
-            
-            // Initialize Model Matrix
-            _modelMatrix = Matrix4.Identity;
-            // --- End Triangle Setup ---
+            // --- End Game Object Setup ---
 
-            // Example: Renderer subscribing to resize events
-            EventManager.Subscribe<WindowResizeEvent>(OnWindowResize); 
-
+            EventManager.Subscribe<WindowResizeEvent>(OnWindowResize);
             Log.Info("Core systems initialized.");
         }
         catch (Exception ex)
@@ -153,8 +150,7 @@ public class Application : IDisposable
             Shutdown(); // Call full shutdown to dispose anything created so far
             _window = null; // Ensure window is null so Run() exits
             _camera = null; // Ensure camera is also nulled on error
-            _triangleMesh = null; // Null out mesh too
-            _texture = null; // Null out texture on error too
+            _gameObjects.Clear(); // Clear potentially partially created objects
         }
     }
 
@@ -202,68 +198,60 @@ public class Application : IDisposable
     { 
         if (_camera == null || _window == null) return;
         
-        // --- Simple Model Rotation ---
-        float angle = (float)_timer.Elapsed.TotalSeconds * MathUtil.DegreesToRadians(30.0f); // Rotate 30 degrees per second
-        _modelMatrix = Matrix4.CreateRotationY(angle); 
-        // To add translation: _modelMatrix = Matrix4.CreateRotationY(angle) * Matrix4.CreateTranslation(x, y, z);
-        // Remember matrix multiplication order matters (usually scale -> rotate -> translate)
-
-        // --- Camera Keyboard Movement ---
+        // --- Update GameObjects ---
+        // Example: Rotate the first game object
+        if (_gameObjects.Count > 0)
+        {
+            var triangleObject = _gameObjects[0];
+            float angle = (float)_timer.Elapsed.TotalSeconds * 30.0f; // degrees per second
+            triangleObject.Transform.EulerAngles = new Vector3(0, angle, 0); // Use EulerAngles setter
+        }
+        
+        // --- Camera Controls ---
         if (InputManager.IsKeyDown(Keys.W)) _camera.ProcessKeyboard(Keys.W, deltaTime);
         if (InputManager.IsKeyDown(Keys.S)) _camera.ProcessKeyboard(Keys.S, deltaTime);
         if (InputManager.IsKeyDown(Keys.A)) _camera.ProcessKeyboard(Keys.A, deltaTime);
         if (InputManager.IsKeyDown(Keys.D)) _camera.ProcessKeyboard(Keys.D, deltaTime);
-        // Optional Up/Down
-        // if (InputManager.IsKeyDown(Keys.Space)) _camera.ProcessKeyboard(Keys.Space, deltaTime);
-        // if (InputManager.IsKeyDown(Keys.LeftShift)) _camera.ProcessKeyboard(Keys.LeftShift, deltaTime);
-
-        // --- Camera Mouse Look ---
         Vector2 mouseDelta = InputManager.GetMousePositionDelta();
-        // Only process if there was actual movement (avoids small drift when not moving)
         if (mouseDelta.LengthSquared > 0.0001f) 
         {
              _camera.ProcessMouseMovement(mouseDelta.X, mouseDelta.Y);
         }
-
-        // --- Input Handling Example ---
         if (InputManager.IsKeyPressed(Keys.Escape))
         {
-            // Toggle cursor grab instead of closing immediately
              _window.CursorState = _window.CursorState == CursorState.Grabbed ? CursorState.Normal : CursorState.Grabbed;
              Log.Info($"Toggled cursor state to: {_window.CursorState}");
-             // EventManager.Publish(new WindowCloseEvent()); // Don't close on Escape now
         }
-        
-        // You can also check for continuous key hold:
-        //if (InputManager.IsKeyDown(Keys.W)) { Log.Debug("W key is held down"); }
-        
-        // Check mouse position
-        //Log.Trace($"Mouse Position: {InputManager.GetMousePosition()}");
     }
 
     private void Render()
     { 
         Renderer.Clear(); 
         
-        if (_shader != null && _triangleMesh != null && _camera != null && _texture != null)
+        if (_camera == null) return;
+
+        // Loop through GameObjects and render them
+        foreach (var gameObject in _gameObjects)
         {
-            _shader.Use();
-
-            // Bind Texture to Texture Unit 0
-            _texture.Bind(TextureUnit.Texture0);
-            // Set the shader's texture uniform to use Texture Unit 0
-            _shader.SetUniformInt("uTexture", 0); 
-
-            _shader.SetUniformMat4("uModel", _modelMatrix);
-            _shader.SetUniformMat4("uView", _camera.ViewMatrix);
-            _shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
-            
-            _triangleMesh.Bind(); 
-            GL.DrawElements(PrimitiveType.Triangles, _triangleMesh.IndexCount, DrawElementsType.UnsignedInt, 0);
-            _triangleMesh.Unbind(); 
-            
-            // Optional: Unbind texture (usually not necessary)
-            // _texture.Unbind(); 
+            // Temporary direct component access
+            if (gameObject.Shader != null && gameObject.Mesh != null && gameObject.Texture != null)
+            {
+                gameObject.Shader.Use();
+                
+                // Bind Texture
+                gameObject.Texture.Bind(TextureUnit.Texture0);
+                gameObject.Shader.SetUniformInt("uTexture", 0); 
+                
+                // Set Uniforms (using GameObject's Transform)
+                gameObject.Shader.SetUniformMat4("uModel", gameObject.Transform.GetLocalMatrix());
+                gameObject.Shader.SetUniformMat4("uView", _camera.ViewMatrix);
+                gameObject.Shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
+                
+                // Draw Mesh
+                gameObject.Mesh.Bind(); 
+                GL.DrawElements(PrimitiveType.Triangles, gameObject.Mesh.IndexCount, DrawElementsType.UnsignedInt, 0);
+                gameObject.Mesh.Unbind();
+            }
         }
     }
 
@@ -271,10 +259,16 @@ public class Application : IDisposable
     { 
         Log.Info("Shutting down subsystems and disposing resources...");
         
-        _texture?.Dispose(); // Dispose Texture
-        _triangleMesh?.Dispose(); 
-        _shader?.Dispose();
-        Log.Info("Rendering resources disposed.");
+        // Dispose resources held by GameObjects (assuming they are owned here for now)
+        // In a real scenario, resource management would be more sophisticated.
+        foreach (var go in _gameObjects)
+        {
+            go.Mesh?.Dispose();
+            go.Texture?.Dispose();
+            go.Shader?.Dispose();
+        }
+        _gameObjects.Clear();
+        Log.Info("Game object resources disposed.");
 
         _window?.Dispose();
         Log.Info("Window disposed.");
