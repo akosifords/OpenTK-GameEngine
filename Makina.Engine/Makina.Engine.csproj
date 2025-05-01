@@ -4,24 +4,22 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>Makina.Core</RootNamespace>
+        <RootNamespace>Makina.Engine</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="BepuPhysics" Version="2.5.0-beta.25" />
-      <PackageReference Include="NAudio" Version="2.2.1" />
+      <PackageReference Include="NLog" Version="5.4.0" />
       <PackageReference Include="OpenTK" Version="4.9.4" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Assets\" />
-      <Folder Include="Audio\" />
-      <Folder Include="Core\" />
-      <Folder Include="Input\" />
-      <Folder Include="Physics\" />
-      <Folder Include="Rendering\" />
-      <Folder Include="Scene\" />
-      <Folder Include="UI\" />
+      <Content Include="nlog.config">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Core\Logging\" />
     </ItemGroup>
 
 </Project>

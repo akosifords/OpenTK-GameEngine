@@ -3,14 +3,6 @@ C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\Sandbox.deps.jso
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\Sandbox.runtimeconfig.json
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\Sandbox.dll
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\Sandbox.pdb
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\BepuPhysics.dll
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\BepuUtilities.dll
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\NAudio.dll
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\NAudio.Asio.dll
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\NAudio.Core.dll
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\NAudio.Midi.dll
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\NAudio.Wasapi.dll
-C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\NAudio.WinMM.dll
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\OpenTK.Audio.OpenAL.dll
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\OpenTK.Compute.dll
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\OpenTK.Core.dll
@@ -38,3 +30,6 @@ C:\Users\dinosoor\RiderProjects\Makina\Sandbox\obj\Debug\net8.0\refint\Sandbox.d
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\obj\Debug\net8.0\Sandbox.pdb
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\obj\Debug\net8.0\Sandbox.genruntimeconfig.cache
 C:\Users\dinosoor\RiderProjects\Makina\Sandbox\obj\Debug\net8.0\ref\Sandbox.dll
+C:\Users\dinosoor\RiderProjects\Makina\Sandbox\obj\Debug\net8.0\Sandbox.sourcelink.json
+C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\nlog.config
+C:\Users\dinosoor\RiderProjects\Makina\Sandbox\bin\Debug\net8.0\NLog.dll

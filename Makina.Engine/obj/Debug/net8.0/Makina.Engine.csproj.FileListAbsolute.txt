@@ -10,3 +10,5 @@ C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Eng
 C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\refint\Makina.Engine.dll
 C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.pdb
 C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\ref\Makina.Engine.dll
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\obj\Debug\net8.0\Makina.Engine.sourcelink.json
+C:\Users\dinosoor\RiderProjects\Makina\Makina.Engine\bin\Debug\net8.0\nlog.config

@@ -43,13 +43,9 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
-            "BepuPhysics": {
+            "NLog": {
               "target": "Package",
-              "version": "[2.5.0-beta.25, )"
-            },
-            "NAudio": {
-              "target": "Package",
-              "version": "[2.2.1, )"
+              "version": "[5.4.0, )"
             },
             "OpenTK": {
               "target": "Package",

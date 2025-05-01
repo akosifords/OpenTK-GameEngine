@@ -1,11 +1,16 @@
-﻿namespace Makina.Engine;
+﻿using Makina.Engine.Core.Logging;
+using NLog;
 
-public class Application
+namespace Makina.Engine;
+
+public class Application : IDisposable
 {
+    private Window? _window;
+
     public Application()
     {
         // Constructor: Basic setup
-        Console.WriteLine("Makina Engine Initializing...");
+        Log.Info("Makina Engine Initializing...");
     }
 
     public void Run()
@@ -13,11 +18,26 @@ public class Application
         // Main engine loop
         Initialize();
         
+        // Ensure window was created
+        if (_window == null)
+        {
+            Log.Error("Window failed to initialize.");
+            return;
+        }
+        
+        Log.Info("Entering main loop...");
         while (ShouldRun())
         {
+            // Process window events first
+            _window.ProcessEvents(); 
+
             Update();
             Render();
+            
+            // Swap buffers at the end of the frame
+            _window.SwapBuffers();
         }
+        Log.Info("Exited main loop.");
         
         Shutdown();
     }
@@ -25,31 +45,53 @@ public class Application
     private void Initialize()
     { 
         // Initialize subsystems (Window, Input, Renderer, etc.)
-        Console.WriteLine("Initializing subsystems...");
+        Log.Info("Initializing subsystems...");
+        try
+        {
+            _window = new Window(); // Create the window
+            Log.Info("Window created.");
+            // TODO: Initialize other subsystems (Renderer, InputManager, etc.)
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Exception during window initialization");
+            _window = null; // Ensure window is null if creation failed
+        }
     }
 
     private bool ShouldRun()
     { 
-        // Loop condition (e.g., check if window is closing)
-        // For now, let's just run a few frames for testing
-        return true; // Placeholder - needs real logic
+        // Loop condition: check if window is closing
+        return _window != null && !_window.IsClosing;
     }
 
     private void Update()
     { 
         // Update game state, handle input, run physics, etc.
-        // Console.WriteLine("Update Tick"); // Can be noisy
+        // Example: Check for Escape key press to close window (requires Input system later)
+        // if (Input.IsKeyPressed(Keys.Escape)) { _window?.Close(); } 
     }
 
     private void Render()
     { 
         // Render the scene
-        // Console.WriteLine("Render Tick"); // Can be noisy
+        // Example: Clear the screen (requires Renderer setup)
+        // Renderer.Clear(0.1f, 0.1f, 0.1f, 1.0f);
     }
 
     private void Shutdown()
     { 
         // Cleanup resources
-        Console.WriteLine("Shutting down subsystems...");
+        Log.Info("Shutting down subsystems...");
+        // Dispose window last, as other systems might depend on it
+        _window?.Dispose();
+        Log.Info("Window disposed.");
+        LogManager.Shutdown();
+    }
+
+    public void Dispose()
+    {
+        Shutdown();
+        GC.SuppressFinalize(this);
     }
 }
