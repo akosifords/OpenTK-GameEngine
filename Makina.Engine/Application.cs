@@ -28,6 +28,7 @@ public class Application : IDisposable
     
     // Scene Management (very basic)
     private List<GameObject> _gameObjects = new List<GameObject>();
+    private GameObject? _selectedGameObject = null; // <<< Added: Currently selected object for inspector
 
     // Timing
     private readonly Stopwatch _timer = new Stopwatch();
@@ -305,64 +306,183 @@ public class Application : IDisposable
         // Potentially use ImGui Docking space here
         // ImGui.DockSpaceOverViewport(ImGui.GetMainViewport());
         
-        ImGui.Begin("Debug Info"); // Create a window
+        ImGui.Begin("Hierarchy"); // Renamed window for clarity
         
         ImGui.Text($"FPS: {_fps:F1}");
         ImGui.Separator();
         
-        if (ImGui.CollapsingHeader("GameObjects"))
+        ImGui.Text("Scene Hierarchy:");
+        ImGui.Separator();
+
+        // Iterate through root GameObjects only (those with no parent)
+        foreach (var go in _gameObjects.Where(g => g.Transform.Parent == null))
         {
-            foreach (var go in _gameObjects)
-            {
-                if (ImGui.TreeNodeEx($"{go.Name}##{go.GetHashCode()}", ImGuiTreeNodeFlags.DefaultOpen)) // Use TreeNodeEx for better control and unique ID
-                {
-                    ImGui.TextDisabled($" Active: {go.IsActive}"); // Show active state
-                    // Optionally show parent name
-                    string parentName = go.Transform.Parent?.GameObject?.Name ?? "None";
-                    ImGui.TextDisabled($" Parent: {parentName}");
-                    ImGui.Separator();
-                    ImGui.Text("Components:");
-                    ImGui.Indent(); // Indent component list
-                    foreach (var component in go.GetAllComponents())
-                    {
-                        ImGui.Text($"- {component.GetType().Name}");
-                        
-                        // Display Transform world details
-                        if (component is Transform transform)
-                        {
-                            ImGui.Indent();
-                            ImGui.Text($"  World Pos: {transform.Position:F2}"); // Use world Position getter
-                            ImGui.Text($"  World Rot: {transform.EulerAngles:F1}"); // Use world EulerAngles getter
-                            ImGui.Text($"  World Scl: {transform.LossyScale:F2}"); // Use world LossyScale getter
-                            ImGui.Separator();
-                            // Optionally show local transform too for debugging
-                            ImGui.Text($"  Local Pos: {transform.LocalPosition:F2}");
-                            ImGui.Text($"  Local Rot: {transform.LocalEulerAngles:F1}");
-                            ImGui.Text($"  Local Scl: {transform.LocalScale:F2}");
-                            ImGui.Unindent();
-                        }
-                        
-                        // Display Directional Light details
-                        if (component is DirectionalLight light)
-                        {
-                             ImGui.Indent();
-                             ImGui.Text($"  Color: {light.Color}");
-                             ImGui.Text($"  Intensity: {light.Intensity:F2}");
-                             ImGui.Unindent();
-                        }
-                    }
-                    ImGui.Unindent(); // Unindent component list
-                    ImGui.TreePop();
-                }
-            }
+             DrawGameObjectNode(go);
         }
         
-        // Add more debug sections as needed (Camera info, Renderer stats, etc.)
-
-        ImGui.End(); // End the window
+        ImGui.End(); // End the Hierarchy window
+        
+        // --- Inspector Panel ---
+        BuildInspectorPanel(); // Call the new inspector panel method
         
         // Example: Show ImGui Demo Window
         // ImGui.ShowDemoWindow(); 
+    }
+
+    /// <summary>
+    /// Recursively draws a GameObject node and its children in the ImGui hierarchy.
+    /// Handles selection.
+    /// </summary>
+    private void DrawGameObjectNode(GameObject go)
+    {
+        if (go == null) return;
+
+        // Node Flags: DefaultOpen, OpenOnArrow, Selectable
+        ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
+        if (go.Transform.Children.Count == 0) 
+        {
+             nodeFlags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen; // No children
+        }
+        // Highlight selected node
+        if (go == _selectedGameObject)
+        {
+             nodeFlags |= ImGuiTreeNodeFlags.Selected;
+        }
+
+        // Unique ID for the node
+        string nodeLabel = $"{go.Name}##{go.GetHashCode()}";
+        
+        // Draw the node
+        bool nodeOpen = ImGui.TreeNodeEx(nodeLabel, nodeFlags);
+
+        // Handle selection
+        if (ImGui.IsItemClicked())
+        {
+            _selectedGameObject = go;
+            Log.Trace($"Selected GameObject: {go.Name}");
+        }
+
+        // If node is open and not a leaf, draw children and pop the tree node
+        if (nodeOpen && (nodeFlags & ImGuiTreeNodeFlags.Leaf) == 0)
+        {
+            foreach (var child in go.Transform.Children)
+            {
+                 DrawGameObjectNode(child.GameObject!); // Recurse for children
+            }
+            ImGui.TreePop();
+        }
+        // Note: For leaf nodes (NoTreePushOnOpen), TreePop is not needed.
+    }
+
+    /// <summary>
+    /// Builds the Inspector panel, showing details of the _selectedGameObject.
+    /// </summary>
+    private void BuildInspectorPanel()
+    {
+         ImGui.Begin("Inspector");
+         
+         if (_selectedGameObject == null)
+         {
+              ImGui.Text("Select a GameObject to inspect.");
+         }
+         else
+         {
+             ImGui.Text($"Inspecting: {_selectedGameObject.Name}");
+             ImGui.Separator();
+             
+             // Display IsActive checkbox
+             bool isActive = _selectedGameObject.IsActive;
+             if (ImGui.Checkbox("Is Active", ref isActive))
+             {
+                 _selectedGameObject.IsActive = isActive;
+             }
+             ImGui.Separator();
+             
+             // Display components and their properties
+             ImGui.Text("Components:");
+             foreach (var component in _selectedGameObject.GetAllComponents())
+             {
+                  string componentName = component.GetType().Name;
+                  if (ImGui.CollapsingHeader($"{componentName}##{component.GetHashCode()}", ImGuiTreeNodeFlags.DefaultOpen))
+                  {
+                       // --- Display Transform Component Details (Editable) ---
+                       if (component is Transform transform)
+                       {
+                            // Use DragFloat3 for editable Vector3 fields
+                            System.Numerics.Vector3 localPos = ToSystemVec3(transform.LocalPosition);
+                            if (ImGui.DragFloat3("Local Position", ref localPos, 0.1f))
+                            {
+                                transform.LocalPosition = ToOpenTKVec3(localPos);
+                            }
+
+                            System.Numerics.Vector3 localEuler = ToSystemVec3(transform.LocalEulerAngles);
+                            if (ImGui.DragFloat3("Local Rotation", ref localEuler, 1.0f))
+                            {
+                                transform.LocalEulerAngles = ToOpenTKVec3(localEuler);
+                            }
+
+                            System.Numerics.Vector3 localScl = ToSystemVec3(transform.LocalScale);
+                            if (ImGui.DragFloat3("Local Scale", ref localScl, 0.05f))
+                            {
+                                // Prevent zero or negative scale if needed
+                                localScl.X = Math.Max(localScl.X, 0.001f);
+                                localScl.Y = Math.Max(localScl.Y, 0.001f);
+                                localScl.Z = Math.Max(localScl.Z, 0.001f);
+                                transform.LocalScale = ToOpenTKVec3(localScl);
+                            }
+                            
+                            ImGui.Separator();
+                            // Display read-only world info
+                            ImGui.TextDisabled($"World Pos: {transform.Position:F2}");
+                            ImGui.TextDisabled($"World Rot: {transform.EulerAngles:F1}");
+                            ImGui.TextDisabled($"World Scale: {transform.LossyScale:F2}");
+                       }
+                       // --- Display Directional Light Component Details (Editable) ---
+                       else if (component is DirectionalLight light)
+                       {
+                            System.Numerics.Vector3 color = ToSystemVec3(light.Color);
+                            if (ImGui.ColorEdit3("Color", ref color))
+                            {
+                                light.Color = ToOpenTKVec3(color);
+                            }
+                            
+                            float intensity = light.Intensity;
+                            if (ImGui.DragFloat("Intensity", ref intensity, 0.05f, 0.0f, 100.0f)) // Min 0, Max 100
+                            {
+                                 light.Intensity = intensity;
+                            }
+                       }
+                       // --- Display MeshRenderer Details (Read-only for now) ---
+                       else if (component is MeshRenderer renderer)
+                       {
+                            string meshName = renderer.Mesh?.GetHashCode().ToString() ?? "None"; // Placeholder ID
+                            string textureName = renderer.Texture?.Handle.ToString() ?? "None";
+                            string shaderName = renderer.Shader?.Handle.ToString() ?? "None";
+                            ImGui.TextDisabled($"Mesh: {meshName}");
+                            ImGui.TextDisabled($"Texture: {textureName}");
+                            ImGui.TextDisabled($"Shader: {shaderName}");
+                       }
+                       // Add more component types here...
+                       else 
+                       {
+                            ImGui.TextDisabled("(No editable properties)");
+                       }
+                  }
+             }
+         }
+         
+         ImGui.End(); // End the Inspector window
+    }
+
+    // Helper methods to convert between OpenTK and System.Numerics vectors
+    private static System.Numerics.Vector3 ToSystemVec3(OpenTK.Mathematics.Vector3 v)
+    {
+        return new System.Numerics.Vector3(v.X, v.Y, v.Z);
+    }
+
+    private static OpenTK.Mathematics.Vector3 ToOpenTKVec3(System.Numerics.Vector3 v)
+    {
+        return new OpenTK.Mathematics.Vector3(v.X, v.Y, v.Z);
     }
 
     private void Render()
