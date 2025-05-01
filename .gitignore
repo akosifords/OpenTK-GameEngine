@@ -68,4 +68,11 @@ TestResults/
 *.zip
 *.tar.gz
 *.nuget.props
-*.nuget.targets 
+*.nuget.targets
+
+# Explicit ignores (may be redundant due to general rules above)
+.idea/
+Sandbox/bin/
+Sandbox/obj/
+Makina.Engine/bin/
+Makina.Engine/obj/ 
