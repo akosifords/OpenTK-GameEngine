@@ -159,6 +159,16 @@ public class Shader : IDisposable
         }
     }
 
+    public void SetUniformVec3(string name, Vector3 data)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(Shader));
+        int location = GetUniformLocation(name);
+        if (location != -1)
+        {
+            GL.Uniform3(location, ref data); // Use GL.Uniform3 for Vector3
+        }
+    }
+
     // TODO: Add SetUniformFloat, SetUniformVec3, etc.
 
     public void Dispose()

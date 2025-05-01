@@ -126,12 +126,19 @@ public class Application : IDisposable
             // 1. Load shared resources
             var shader = new Makina.Engine.Rendering.Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
             var texture = new Texture("Assets/Textures/container.png");
-            float[] vertices = { 0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  0.5f, 1.0f, -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f, 0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f };
+            // Updated vertices with normals (Pos(3) + Color(3) + TexCoord(2) + Normal(3) = 11 floats per vertex)
+            float[] vertices = {
+                 // Positions          // Colors (unused)    // TexCoords  // Normals
+                 0.0f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   0.5f, 1.0f,   0.0f, 0.0f, 1.0f, // Top vertex
+                -0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 0.0f,   0.0f, 0.0f, 1.0f, // Bottom left vertex
+                 0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   1.0f, 0.0f,   0.0f, 0.0f, 1.0f  // Bottom right vertex
+            };
             uint[] indices = { 0, 1, 2 };
             var layout = new VertexBufferLayout();
-            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // Position
-            layout.AddElement(1, 3, VertexAttribPointerType.Float, false); // Color (unused by shader)
-            layout.AddElement(2, 2, VertexAttribPointerType.Float, false); // TexCoord
+            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // Position (location 0)
+            layout.AddElement(1, 3, VertexAttribPointerType.Float, false); // Color (location 1 - unused)
+            layout.AddElement(2, 2, VertexAttribPointerType.Float, false); // TexCoord (location 2)
+            layout.AddElement(3, 3, VertexAttribPointerType.Float, false); // Normal (location 3)
             var mesh = new Mesh(vertices, indices, layout);
 
             // 2. Create First GameObject (Rotating)
@@ -152,6 +159,21 @@ public class Application : IDisposable
             triangleObject2.Transform.Scale = new Vector3(0.75f); 
             _gameObjects.Add(triangleObject2);
             Log.Info("Second game object created with MeshRenderer at offset.");
+
+            // 4. Create Directional Light GameObject
+            var lightObject = new GameObject("DirectionalLightSource");
+            var lightComponent = new DirectionalLight 
+            {
+                Color = new Vector3(1.0f, 1.0f, 1.0f), // White light
+                Intensity = 1.0f
+            };
+            lightObject.AddComponent(lightComponent);
+            // Set rotation so its Forward vector matches our desired light direction (0.5, -1.0, -0.5) normalized
+            // This requires figuring out the Euler angles or Quaternion for that direction. 
+            // Let's approximate with Euler angles for simplicity. Pointing down-right-ish.
+            lightObject.Transform.EulerAngles = new Vector3(45.0f, -30.0f, 0.0f); 
+            _gameObjects.Add(lightObject);
+            Log.Info("Directional light game object created.");
             
             // --- End Game Object Setup ---
 
@@ -331,25 +353,73 @@ public class Application : IDisposable
         
         if (_camera == null) return;
 
+        // --- Find Directional Light in Scene ---
+        DirectionalLight? sceneLight = null;
+        Transform? lightTransform = null;
+        foreach (var go in _gameObjects)
+        {
+            if (go.TryGetComponent<DirectionalLight>(out sceneLight))
+            {
+                lightTransform = go.Transform;
+                break; // Found the first light, stop searching
+            }
+        }
+
+        // --- Set Default Light if None Found (Optional Fallback) ---
+        Vector3 currentLightDir = new Vector3(0, 0, -1); // Default towards -Z
+        Vector3 currentLightColor = Vector3.Zero; // Default off
+        bool lightWarningLogged = false; // Flag to log warning only once
+        if (sceneLight != null && lightTransform != null)
+        {
+            // Direction *towards* light is negative of the transform's forward vector
+            currentLightDir = -lightTransform.Forward; 
+            currentLightColor = sceneLight.EffectiveColor;
+        }
+        else
+        {
+            if (!lightWarningLogged)
+            {
+                Log.Warn("RenderLoop: No DirectionalLight found in scene. Using default.");
+                lightWarningLogged = true;
+            }
+        }
+
+        // --- Get Camera Position --- 
+        Vector3 cameraPosition = _camera.Position;
+        // Remove hardcoded object color, maybe make it a component property later
+        Vector3 objectBaseColor = new Vector3(1.0f, 0.5f, 0.31f); 
+
         // Loop through GameObjects and render them
         foreach (var gameObject in _gameObjects)
         {
+            // Skip rendering the light source itself if it doesn't have a MeshRenderer
+            if (!gameObject.TryGetComponent<MeshRenderer>(out _)) continue; // Use TryGetComponent instead of HasComponent
+            
             if (!gameObject.IsActive) continue; // Skip inactive GameObjects
 
             // TryGetComponent is slightly more efficient if component might be missing
             if (gameObject.TryGetComponent<MeshRenderer>(out var renderer) && 
-                renderer.Shader != null && renderer.Mesh != null && renderer.Texture != null)
+                renderer.Shader != null && renderer.Mesh != null) 
             {
                 renderer.Shader.Use();
                 
-                // Bind Texture
-                renderer.Texture.Bind(TextureUnit.Texture0);
-                renderer.Shader.SetUniformInt("uTexture", 0); 
+                // Bind Texture (Still useful if shader uses it, e.g., for modulation)
+                if (renderer.Texture != null) 
+                {
+                    renderer.Texture.Bind(TextureUnit.Texture0);
+                    renderer.Shader.SetUniformInt("uTexture", 0); 
+                }
                 
-                // Set Uniforms (using GameObject's Transform)
+                // Set Transformation Uniforms (using GameObject's Transform)
                 renderer.Shader.SetUniformMat4("uModel", gameObject.Transform.GetLocalMatrix());
                 renderer.Shader.SetUniformMat4("uView", _camera.ViewMatrix);
                 renderer.Shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
+                
+                // --- Set Lighting Uniforms ---
+                renderer.Shader.SetUniformVec3("objectColor", objectBaseColor); // Still hardcoded base color
+                renderer.Shader.SetUniformVec3("lightColor", currentLightColor); // Use color from scene light
+                renderer.Shader.SetUniformVec3("lightDir", currentLightDir);     // Use direction from scene light
+                renderer.Shader.SetUniformVec3("viewPos", cameraPosition);
                 
                 // Draw Mesh
                 renderer.Mesh.Bind(); 

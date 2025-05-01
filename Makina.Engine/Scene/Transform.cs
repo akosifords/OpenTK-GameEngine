@@ -42,6 +42,12 @@ public class Transform : Component
         set => Rotation = Quaternion.FromEulerAngles(value * Core.Math.MathUtil.DegToRad);
     }
 
+    // Forward direction vector based on rotation
+    public Vector3 Forward => Vector3.Transform(-Vector3.UnitZ, Rotation); // Negative Z is often forward in OpenGL conventions
+    // Add Right and Up vectors similarly if needed
+    // public Vector3 Right => Vector3.Transform(Vector3.UnitX, Rotation);
+    // public Vector3 Up => Vector3.Transform(Vector3.UnitY, Rotation);
+
     // TODO: Add Parent/Child relationship support later for scene hierarchy
     // public Transform? Parent { get; set; }
     // public List<Transform> Children { get; } = new List<Transform>();
