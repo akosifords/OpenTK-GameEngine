@@ -1,6 +1,8 @@
 ﻿using Makina.Engine.Core.Logging;
 using NLog;
 using Makina.Engine.Rendering;
+using Makina.Engine.Core.Events;
+using System;
 
 namespace Makina.Engine;
 
@@ -26,6 +28,9 @@ public class Application : IDisposable
             return;
         }
         
+        // Subscribe to events AFTER subsystems are initialized
+        SubscribeToEvents();
+
         Log.Info("Entering main loop...");
         while (ShouldRun())
         {
@@ -40,6 +45,7 @@ public class Application : IDisposable
         }
         Log.Info("Exited main loop.");
         
+        UnsubscribeFromEvents(); // Unsubscribe before shutdown
         Shutdown();
     }
 
@@ -54,7 +60,20 @@ public class Application : IDisposable
             
             Renderer.Init(); // Initialize Renderer AFTER window/context exists
 
+            // Ensure window and renderer are valid before proceeding
+            if (_window == null)
+            {
+                Log.Fatal("Cannot continue without a valid window.");
+                // Potentially throw or handle more gracefully
+                return; 
+            }
+
+            // Example: Renderer subscribing to resize events
+            EventManager.Subscribe<WindowResizeEvent>(OnWindowResize); 
+
             // TODO: Initialize other subsystems (InputManager, etc.)
+
+            Log.Info("Core systems initialized.");
         }
         catch (Exception ex)
         {
@@ -63,6 +82,36 @@ public class Application : IDisposable
             _window?.Dispose(); 
             _window = null; 
         }
+    }
+
+    private void SubscribeToEvents()
+    {
+        // Example: Application subscribing to the window close event
+        EventManager.Subscribe<WindowCloseEvent>(OnWindowClose); 
+        Log.Trace("Application subscribed to events.");
+    }
+    
+    private void UnsubscribeFromEvents()
+    {
+        EventManager.Unsubscribe<WindowCloseEvent>(OnWindowClose);
+        EventManager.Unsubscribe<WindowResizeEvent>(OnWindowResize); // Ensure Renderer also unsubscribes if needed
+        Log.Trace("Application unsubscribed from events.");
+    }
+
+    // --- Event Handlers ---
+
+    private void OnWindowClose(WindowCloseEvent e)
+    {
+        Log.Info("WindowCloseEvent received by Application. Preparing to exit.");
+        // The main loop condition (_window.IsClosing) will handle the actual exit.
+        // We could set e.Handled = true here to prevent closing, if needed.
+    }
+
+    private void OnWindowResize(WindowResizeEvent e)
+    {
+        Log.Debug($"Application received WindowResizeEvent: {e.Width}x{e.Height}");
+        // Potentially pause rendering or updates during resize if needed
+        // Note: Viewport is already handled by Window.cs and potentially Renderer.cs
     }
 
     private bool ShouldRun()

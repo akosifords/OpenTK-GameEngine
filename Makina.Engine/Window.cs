@@ -4,6 +4,8 @@ using OpenTK.Mathematics; // For Vector2i
 using OpenTK.Windowing.GraphicsLibraryFramework; // Added for IBindingsContext
 using Makina.Engine.Core.Logging; // Added
 using OpenTK.Graphics.OpenGL4; // Added for GL calls
+using Makina.Engine.Core.Events; // Added
+using System;
 
 namespace Makina.Engine;
 
@@ -23,7 +25,7 @@ public class Window : IDisposable
         set => _nativeWindow.ClientSize = value;
     }
 
-    public bool IsClosing => _nativeWindow.IsExiting;
+    public bool IsClosing { get; private set; } = false;
 
     public Window(string title = "Makina Engine", int width = 1280, int height = 720)
     {
@@ -41,9 +43,10 @@ public class Window : IDisposable
         _nativeWindow = new GameWindow(gameWindowSettings, nativeWindowSettings);
         Log.Info($"Native window created: Title='{Title}', Size={Size.X}x{Size.Y}");
 
-        // Hook up events if needed (e.g., Resize, KeyDown, etc.)
-        _nativeWindow.Resize += args => OnResize(args);
-        // Add more event handlers here
+        // Hook up OpenTK events to publish engine events
+        _nativeWindow.Resize += OnResize;
+        _nativeWindow.Closing += OnClosing;
+        // TODO: Hook up Keyboard/Mouse events here later
     }
 
     public void ProcessEvents()
@@ -60,12 +63,30 @@ public class Window : IDisposable
         _nativeWindow.SwapBuffers();
     }
 
-    // Example Event Handler
+    // --- Event Handlers --- 
+    
     private void OnResize(ResizeEventArgs args)
     {
-        Log.Debug($"Window resized to: {args.Width}x{args.Height}");
-        // Set OpenGL viewport when the window is resized
+        Log.Trace($"Native window resize event: {args.Width}x{args.Height}");
+        // Set OpenGL viewport directly (Renderer might also subscribe to this event)
         GL.Viewport(0, 0, args.Width, args.Height);
+        
+        // Publish the engine event
+        var resizeEvent = new WindowResizeEvent(args.Width, args.Height);
+        EventManager.Publish(resizeEvent);
+    }
+
+    private void OnClosing(System.ComponentModel.CancelEventArgs args)
+    {
+        Log.Trace("Native window closing event received.");
+        IsClosing = true; // Set internal flag
+        
+        // Publish the engine event
+        var closeEvent = new WindowCloseEvent();
+        EventManager.Publish(closeEvent);
+        
+        // We could potentially allow a listener to cancel closing by setting closeEvent.Handled = true
+        // if (closeEvent.Handled) { args.Cancel = true; IsClosing = false; }
     }
 
     public void Dispose()
