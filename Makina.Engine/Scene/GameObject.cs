@@ -11,13 +11,14 @@ namespace Makina.Engine.Scene;
 /// Basic container for entities in the scene.
 /// Manages a collection of Components that define its behavior and data.
 /// </summary>
-public class GameObject
+public class GameObject : IDisposable
 {
     public Transform Transform { get; private set; }
     public string Name { get; set; }
     public bool IsActive { get; set; } = true;
 
     private readonly Dictionary<Type, Component> _components = new Dictionary<Type, Component>();
+    private bool _isDisposed = false;
 
     public GameObject(string name = "GameObject")
     {
@@ -108,5 +109,40 @@ public class GameObject
     public IEnumerable<Component> GetAllComponents()
     {
         return _components.Values;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_isDisposed) return;
+
+        if (disposing)
+        {
+            Log.Trace($"Disposing GameObject '{Name}' and its components...");
+            foreach (var component in _components.Values.ToList())
+            { 
+                if (component is IDisposable disposableComponent)
+                { 
+                    try
+                    {
+                        disposableComponent.Dispose();
+                        Log.Trace($"- Disposed component: {component.GetType().Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, $"Error disposing component {component.GetType().Name} in GameObject {Name}");
+                    }
+                }
+            }
+            _components.Clear();
+        }
+
+        _isDisposed = true;
+        Log.Trace($"GameObject '{Name}' disposal complete.");
     }
 } 

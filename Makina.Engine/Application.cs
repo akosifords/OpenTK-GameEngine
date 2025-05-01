@@ -17,6 +17,7 @@ using Makina.Engine.Debugging; // Added
 using ImGuiNET; // Added
 using Makina.Engine.Scene.Components; // <<< Added
 using System.Linq;                  // <<< Added for LINQ in Shutdown
+using Makina.Engine.Core;           // <<< Added for ResourceManager
 
 namespace Makina.Engine;
 
@@ -126,7 +127,9 @@ public class Application : IDisposable
 
             // 1. Load shared resources
             var shader = new Makina.Engine.Rendering.Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
+            ResourceManager.Track(shader); // <<< Track the shader
             var texture = new Texture("Assets/Textures/container.png");
+            ResourceManager.Track(texture); // <<< Track the texture
             // Updated vertices with normals (Pos(3) + Color(3) + TexCoord(2) + Normal(3) = 11 floats per vertex)
             float[] vertices = {
                  // Positions          // Colors (unused)    // TexCoords  // Normals
@@ -141,6 +144,7 @@ public class Application : IDisposable
             layout.AddElement(2, 2, VertexAttribPointerType.Float, false); // TexCoord (location 2)
             layout.AddElement(3, 3, VertexAttribPointerType.Float, false); // Normal (location 3)
             var mesh = new Mesh(vertices, indices, layout);
+            ResourceManager.Track(mesh); // <<< Track the mesh
 
             // Create a shared Material instance
             var basicMaterial = new Material(shader, texture)
@@ -595,44 +599,27 @@ public class Application : IDisposable
 
     private void Shutdown()
     {
-        Log.Info("Shutting down subsystems and disposing resources...");
-        
+        Log.Info("Starting engine shutdown procedure...");
+
+        // Release managed resources FIRST (includes shader and texture now)
+        ResourceManager.ReleaseAll();
+
+        Log.Info("Disposing game objects and their components...");
+        foreach (var go in _gameObjects.ToList()) // Iterate over a copy
+        {
+            go.Dispose(); // Ensure GameObjects release their components
+        }
+        _gameObjects.Clear();
+        _selectedGameObject = null; // Clear selection
+
         _imGuiController?.Dispose();
         
-        // Dispose unique resources used by MeshRenderers
-        var uniqueMeshes = new HashSet<Mesh>();
-        // <<< Get unique Textures and Shaders from Materials >>>
-        var uniqueTextures = new HashSet<Texture>();
-        var uniqueShaders = new HashSet<Rendering.Shader>();
-        var uniqueMaterials = new HashSet<Material>(); // Keep track to avoid duplicate checks
-
-        foreach (var go in _gameObjects)
-        { 
-            if(go.TryGetComponent<MeshRenderer>(out var renderer))
-            {
-                if (renderer.Mesh != null) uniqueMeshes.Add(renderer.Mesh);
-                // Add Material components
-                if (renderer.Material != null && uniqueMaterials.Add(renderer.Material))
-                {
-                     if (renderer.Material.Texture != null) uniqueTextures.Add(renderer.Material.Texture);
-                     if (renderer.Material.Shader != null) uniqueShaders.Add(renderer.Material.Shader);
-                     // Optionally dispose the material itself if it becomes disposable
-                     // renderer.Material.Dispose(); 
-                }
-            }
-        }
+        // <<< Removed Mesh disposal loop >>>
+        // Log.Info($"Disposing {uniqueMeshes.Count} unique Meshes...");
+        // foreach (var mesh in uniqueMeshes) mesh.Dispose();
         
-        Log.Info($"Disposing {uniqueMeshes.Count} unique Meshes...");
-        foreach (var mesh in uniqueMeshes) mesh.Dispose();
-        
-        Log.Info($"Disposing {uniqueTextures.Count} unique Textures...");
-        foreach (var texture in uniqueTextures) texture.Dispose();
-        
-        Log.Info($"Disposing {uniqueShaders.Count} unique Shaders...");
-        foreach (var shader in uniqueShaders) shader.Dispose();
-
-        _gameObjects.Clear();
-        Log.Info("Game objects cleared.");
+        // <<< Removed Texture disposal loop >>>
+        // <<< Removed Shader disposal loop >>>
 
         _window?.Dispose();
         Log.Info("Window disposed.");
