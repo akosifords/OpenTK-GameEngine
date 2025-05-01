@@ -5,7 +5,6 @@ using Makina.Engine.Core.Events;
 using Makina.Engine.Input;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using System;
-using Makina.Engine.Rendering.Buffers;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using System.Diagnostics; // Added for Stopwatch
@@ -19,11 +18,9 @@ public class Application : IDisposable
     private Window? _window;
     private PerspectiveCamera? _camera;
     
-    // Triangle Rendering Resources
+    // Rendering Resources
     private Shader? _shader;
-    private VertexArray? _vertexArray;
-    private VertexBuffer? _vertexBuffer;
-    private IndexBuffer? _indexBuffer;
+    private Mesh? _triangleMesh; // Changed from VBO/IBO/VAO
     private Matrix4 _modelMatrix;
 
     // Timing
@@ -42,9 +39,9 @@ public class Application : IDisposable
         Initialize();
         
         // Ensure window was created
-        if (_window == null || _camera == null)
+        if (_window == null || _camera == null || _triangleMesh == null)
         {
-            Log.Error("Window or Camera failed to initialize.");
+            Log.Error("Window, Camera or Mesh failed to initialize.");
             return;
         }
         
@@ -110,38 +107,15 @@ public class Application : IDisposable
             // --- Setup Triangle --- 
             Log.Info("Setting up triangle geometry...");
 
-            // 1. Define Vertices (Position only)
-            float[] vertices = {
-                // Position       
-                 0.0f,  0.5f, 0.0f, // Top center
-                -0.5f, -0.5f, 0.0f, // Bottom left
-                 0.5f, -0.5f, 0.0f  // Bottom right
-            };
+            // 1. Define Vertices & Indices
+            float[] vertices = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
+            uint[] indices = { 0, 1, 2 };
 
-            // 2. Define Indices
-            uint[] indices = {
-                0, 1, 2
-            };
-
-            // 3. Create Shader
+            // 2. Create Shader
             _shader = new Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
 
-            // 4. Create Buffers
-            _vertexBuffer = VertexBuffer.CreateWithData(vertices);
-            _indexBuffer = new IndexBuffer(indices);
-
-            // 5. Create Vertex Array and configure layout
-            _vertexArray = new VertexArray();
-            var layout = new VertexBufferLayout();
-            layout.AddElement(0, 3, VertexAttribPointerType.Float, false); // layout(location = 0) = vec3 position
-            
-            _vertexArray.AddVertexBuffer(_vertexBuffer, layout);
-            _vertexArray.SetIndexBuffer(_indexBuffer);
-            
-            // Unbind VAO after setup (good practice)
-            _vertexArray.Unbind(); 
-            _vertexBuffer.Unbind();
-            _indexBuffer.Unbind();
+            // 3. Create Mesh (encapsulates VBO/IBO/VAO)
+            _triangleMesh = new Mesh(vertices, indices); 
             
             Log.Info("Triangle geometry setup complete.");
             
@@ -162,6 +136,7 @@ public class Application : IDisposable
             Shutdown(); // Call full shutdown to dispose anything created so far
             _window = null; // Ensure window is null so Run() exits
             _camera = null; // Ensure camera is also nulled on error
+            _triangleMesh = null; // Null out mesh too
         }
     }
 
@@ -169,6 +144,7 @@ public class Application : IDisposable
     {
         // Example: Application subscribing to the window close event
         EventManager.Subscribe<WindowCloseEvent>(OnWindowClose); 
+        EventManager.Subscribe<WindowResizeEvent>(OnWindowResize);
         Log.Trace("Application subscribed to events.");
     }
     
@@ -251,19 +227,17 @@ public class Application : IDisposable
     { 
         Renderer.Clear(); // Clear the screen
         
-        if (_shader != null && _vertexArray != null && _indexBuffer != null && _camera != null)
+        // Use Mesh for drawing
+        if (_shader != null && _triangleMesh != null && _camera != null)
         {
             _shader.Use();
-
-            // Set Uniforms
             _shader.SetUniformMat4("uModel", _modelMatrix);
             _shader.SetUniformMat4("uView", _camera.ViewMatrix);
             _shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
             
-            // Draw
-            _vertexArray.Bind();
-            GL.DrawElements(PrimitiveType.Triangles, _indexBuffer.Count, DrawElementsType.UnsignedInt, 0);
-            _vertexArray.Unbind();
+            _triangleMesh.Bind(); // Bind Mesh's VAO
+            GL.DrawElements(PrimitiveType.Triangles, _triangleMesh.IndexCount, DrawElementsType.UnsignedInt, 0);
+            _triangleMesh.Unbind(); // Unbind Mesh's VAO
         }
     }
 
@@ -271,10 +245,7 @@ public class Application : IDisposable
     { 
         Log.Info("Shutting down subsystems and disposing resources...");
         
-        // Dispose rendering resources first (reverse order of creation is often safe)
-        _indexBuffer?.Dispose();
-        _vertexBuffer?.Dispose();
-        _vertexArray?.Dispose(); // VAO doesn't own buffers, dispose it after
+        _triangleMesh?.Dispose(); // Dispose Mesh
         _shader?.Dispose();
         Log.Info("Rendering resources disposed.");
 
