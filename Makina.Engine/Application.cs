@@ -14,6 +14,7 @@ namespace Makina.Engine;
 public class Application : IDisposable
 {
     private Window? _window;
+    private PerspectiveCamera? _camera;
     
     // Triangle Rendering Resources
     private Shader? _shader;
@@ -33,9 +34,9 @@ public class Application : IDisposable
         Initialize();
         
         // Ensure window was created
-        if (_window == null)
+        if (_window == null || _camera == null)
         {
-            Log.Error("Window failed to initialize or required resources could not be created.");
+            Log.Error("Window or Camera failed to initialize.");
             return;
         }
         
@@ -76,6 +77,10 @@ public class Application : IDisposable
         {
             _window = new Window(); 
             Log.Info("Window created.");
+            
+            float aspectRatio = (float)_window.Size.X / _window.Size.Y;
+            _camera = new PerspectiveCamera(new Vector3(0.0f, 0.0f, 3.0f), aspectRatio);
+            Log.Info("Camera created.");
             
             Renderer.Init(); 
             Log.Info("Renderer initialized.");
@@ -130,6 +135,7 @@ public class Application : IDisposable
             // Cleanup partially created resources
             Shutdown(); // Call full shutdown to dispose anything created so far
             _window = null; // Ensure window is null so Run() exits
+            _camera = null; // Ensure camera is also nulled on error
         }
     }
 
@@ -159,8 +165,11 @@ public class Application : IDisposable
     private void OnWindowResize(WindowResizeEvent e)
     {
         Log.Debug($"Application received WindowResizeEvent: {e.Width}x{e.Height}");
-        // Potentially pause rendering or updates during resize if needed
-        // Note: Viewport is already handled by Window.cs and potentially Renderer.cs
+        if (e.Width > 0 && e.Height > 0 && _camera != null)
+        {
+            _camera.AspectRatio = (float)e.Width / e.Height;
+        }
+        // Viewport is handled in Window.cs
     }
 
     private bool ShouldRun()
@@ -171,7 +180,16 @@ public class Application : IDisposable
 
     private void Update()
     { 
-        // Example: Check for Escape key press to close window
+        // --- Update Camera (Example: Simple rotation) ---
+        // TODO: Replace with actual camera controls based on input
+        if (_camera != null)
+        {
+             // Example: Rotate camera position around Y axis (or move based on input)
+             // float time = (float)GLFW.GetTime();
+             // _camera.Position = new Vector3((float)Math.Sin(time) * 3.0f, 0.0f, (float)Math.Cos(time) * 3.0f);
+        }
+
+        // --- Input Handling Example ---
         if (InputManager.IsKeyPressed(Keys.Escape))
         {
             Log.Info("Escape key pressed, publishing WindowCloseEvent.");
@@ -185,22 +203,27 @@ public class Application : IDisposable
         //if (InputManager.IsKeyDown(Keys.W)) { Log.Debug("W key is held down"); }
         
         // Check mouse position
-        Log.Trace($"Mouse Position: {InputManager.GetMousePosition()}");
+        //Log.Trace($"Mouse Position: {InputManager.GetMousePosition()}");
     }
 
     private void Render()
     { 
         Renderer.Clear(); // Clear the screen
         
-        // Draw the triangle if resources are valid
-        if (_shader != null && _vertexArray != null && _indexBuffer != null)
+        if (_shader != null && _vertexArray != null && _indexBuffer != null && _camera != null)
         {
             _shader.Use();
+
+            // Set Uniforms
+            Matrix4 model = Matrix4.Identity; // No model transformation yet
+            _shader.SetUniformMat4("uModel", model);
+            _shader.SetUniformMat4("uView", _camera.ViewMatrix);
+            _shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
+            
+            // Draw
             _vertexArray.Bind();
-            
             GL.DrawElements(PrimitiveType.Triangles, _indexBuffer.Count, DrawElementsType.UnsignedInt, 0);
-            
-            _vertexArray.Unbind(); // Unbind VAO after drawing
+            _vertexArray.Unbind();
         }
     }
 

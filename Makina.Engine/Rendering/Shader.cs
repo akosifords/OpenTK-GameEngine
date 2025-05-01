@@ -3,6 +3,7 @@ using OpenTK.Graphics.OpenGL4;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using OpenTK.Mathematics;
 
 namespace Makina.Engine.Rendering;
 
@@ -11,8 +12,8 @@ public class Shader : IDisposable
     public readonly int Handle;
     private bool _disposed = false;
 
-    // TODO: Add uniform caching later
-    // private readonly Dictionary<string, int> _uniformLocationCache = new Dictionary<string, int>();
+    // Simple uniform location caching
+    private readonly Dictionary<string, int> _uniformLocationCache = new Dictionary<string, int>();
 
     public Shader(string vertexPath, string fragmentPath)
     {
@@ -97,9 +98,36 @@ public class Shader : IDisposable
         GL.UseProgram(Handle);
     }
 
-    // TODO: Add methods for setting uniforms (e.g., SetInt, SetFloat, SetMat4)
-    // public int GetUniformLocation(string name) { ... }
-    // public void SetUniformMat4(string name, Matrix4 data) { ... }
+    // --- Uniform Setting Methods ---
+
+    public int GetUniformLocation(string name)
+    {
+        if (_uniformLocationCache.TryGetValue(name, out int location))
+        {
+            return location;
+        }
+
+        location = GL.GetUniformLocation(Handle, name);
+        if (location == -1) 
+        {
+            Log.Warn($"Uniform '{name}' not found in shader program (Handle: {Handle}).");
+        }
+        _uniformLocationCache[name] = location;
+        return location;
+    }
+
+    public void SetUniformMat4(string name, Matrix4 data)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(Shader));
+        int location = GetUniformLocation(name);
+        if (location != -1)
+        {
+            // The 'transpose' parameter is set to false because OpenTK matrices are already column-major.
+            GL.UniformMatrix4(location, false, ref data);
+        }
+    }
+    
+    // TODO: Add SetUniformFloat, SetUniformVec3, SetUniformInt, etc.
 
     public void Dispose()
     {
@@ -113,7 +141,7 @@ public class Shader : IDisposable
         {
             if (disposing)
             {
-                // No managed resources to dispose currently
+                _uniformLocationCache.Clear();
             }
 
             // Always dispose unmanaged OpenGL resource

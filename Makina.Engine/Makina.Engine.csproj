@@ -25,6 +25,7 @@
       <Folder Include="Assets\Shaders\" />
       <Folder Include="Core\Events\" />
       <Folder Include="Core\Logging\" />
+      <Folder Include="Core\Math\" />
       <Folder Include="Input\" />
       <Folder Include="Rendering\Buffers\" />
       <Folder Include="Rendering\" />
