@@ -286,9 +286,34 @@ public class Application : IDisposable
         {
             foreach (var go in _gameObjects)
             {
-                ImGui.Text($"- {go.Name}");
-                // TODO: Add more details? (Position, etc.)
-                // ImGui.SameLine(); ImGui.Text($" Pos: {go.Transform.Position}"); 
+                if (ImGui.TreeNodeEx($"{go.Name}##{go.GetHashCode()}", ImGuiTreeNodeFlags.DefaultOpen)) // Use TreeNodeEx for better control and unique ID
+                {
+                    ImGui.TextDisabled($" Active: {go.IsActive}"); // Show active state
+                    ImGui.Separator();
+                    ImGui.Text("Components:");
+                    ImGui.Indent(); // Indent component list
+                    foreach (var component in go.GetAllComponents())
+                    {
+                        ImGui.Text($"- {component.GetType().Name}");
+                        // Optional: Add specific component details here later
+                        // if (component is MeshRenderer mr) { ... }
+
+                        // Display Transform details
+                        if (component is Transform transform)
+                        {
+                            ImGui.Indent();
+                            // Use a smaller font or tighter spacing if needed
+                            // ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new System.Numerics.Vector2(4, 1)); 
+                            ImGui.Text($"  Pos: {transform.Position}");
+                            ImGui.Text($"  Rot: {transform.EulerAngles}"); // Display Euler angles
+                            ImGui.Text($"  Scl: {transform.Scale}");
+                            // ImGui.PopStyleVar();
+                            ImGui.Unindent();
+                        }
+                    }
+                    ImGui.Unindent(); // Unindent component list
+                    ImGui.TreePop();
+                }
             }
         }
         
