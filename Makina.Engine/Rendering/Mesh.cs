@@ -17,17 +17,17 @@ public class Mesh : IDisposable
     private IndexBuffer _indexBuffer;
     private bool _disposed = false;
 
-    // TODO: Extend constructor or add methods to handle more complex vertex layouts (e.g., positions, normals, texcoords)
-    
     /// <summary>
-    /// Creates a new Mesh with position-only vertex data.
+    /// Creates a new Mesh.
     /// </summary>
-    /// <param name="vertices">Array of vertex positions (floats, 3 per vertex).</param>
+    /// <param name="vertices">Array of vertex data (floats).</param>
     /// <param name="indices">Array of indices defining triangles.</param>
-    public Mesh(float[] vertices, uint[] indices)
+    /// <param name="layout">The layout description for the vertex data.</param>
+    public Mesh(float[] vertices, uint[] indices, VertexBufferLayout layout)
     {
         if (vertices == null || vertices.Length == 0) throw new ArgumentNullException(nameof(vertices));
         if (indices == null || indices.Length == 0) throw new ArgumentNullException(nameof(indices));
+        if (layout == null || layout.Elements.Count == 0) throw new ArgumentNullException(nameof(layout));
 
         // Create Buffers
         _vertexBuffer = VertexBuffer.CreateWithData(vertices); 
@@ -35,11 +35,7 @@ public class Mesh : IDisposable
 
         // Create Vertex Array and configure layout
         VertexArray = new VertexArray();
-        var layout = new VertexBufferLayout();
-        // Assuming layout(location = 0) is vec3 position
-        layout.AddElement(0, 3, VertexAttribPointerType.Float, false); 
-            
-        VertexArray.AddVertexBuffer(_vertexBuffer, layout);
+        VertexArray.AddVertexBuffer(_vertexBuffer, layout); // Use the provided layout
         VertexArray.SetIndexBuffer(_indexBuffer);
             
         // Unbind after setup
@@ -47,7 +43,7 @@ public class Mesh : IDisposable
         _vertexBuffer.Unbind();
         _indexBuffer.Unbind();
         
-        Log.Info($"Created Mesh (VAO: {VertexArray.Handle}, VBO: {_vertexBuffer.Handle}, IBO: {_indexBuffer.Handle}, Vertices: {vertices.Length/3}, Indices: {indices.Length})");
+        Log.Info($"Created Mesh (VAO: {VertexArray.Handle}, VBO: {_vertexBuffer.Handle}, IBO: {_indexBuffer.Handle}, Vertices: {vertices.Length / (layout.Stride / sizeof(float))}, Indices: {indices.Length})"); // Adjusted vertex count log
     }
 
     public int IndexCount => _indexBuffer.Count;
@@ -73,27 +69,25 @@ public class Mesh : IDisposable
     {
         if (!_disposed)
         {
+            // Dispose managed resources first
             if (disposing)
             {
-                // Dispose managed resources if any were held directly by Mesh (none currently)
+                // Nothing managed to dispose here yet
             }
 
             // Dispose unmanaged OpenGL resources owned by this Mesh
-            // Order: VAO contains references, so dispose buffers first is often safer, then VAO.
-            // Although in our current setup VAO doesn't strictly own them, it's good practice.
             _indexBuffer?.Dispose();
             _vertexBuffer?.Dispose();
             VertexArray?.Dispose(); 
             
-            Log.Trace($"Disposed Mesh (VAO: {VertexArray?.Handle})");
+            Log.Trace($"Disposed Mesh resources"); // Simplified log
             _disposed = true;
         }
     }
 
     ~Mesh()
     {
-        // We expect Dispose to be called, so log a warning if the finalizer runs.
-        Log.Warn($"Mesh (VAO: {VertexArray?.Handle}) not disposed explicitly. Cleaning up in finalizer.");
+        Log.Warn($"Mesh not disposed explicitly. Cleaning up in finalizer.");
         Dispose(false);
     }
 } 
