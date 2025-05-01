@@ -1,33 +1,43 @@
-# Makina
-Makina - Game Engine
+# Makina ✨
 
-## Getting Started
+*Makina - A simple Game Engine built with C# and OpenTK.*
 
-### Prerequisites
+---
 
-*   [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (or later)
-*   Git
-*   An IDE that supports .NET development is recommended (Visual Studio, JetBrains Rider, VS Code with C# extension).
+## 🚀 Getting Started
 
-### Cloning
+This guide will help you get a copy of the project up and running on your local machine.
 
-To get a copy of the project, clone the repository using Git:
+### ✅ Prerequisites
+
+*   **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)** (or later)
+*   **Git**
+*   An IDE supporting .NET development is recommended (e.g., Visual Studio, JetBrains Rider, VS Code with the C# extension).
+
+---
+
+### 💾 Cloning
+
+To get a local copy, clone the repository using Git:
 
 ```bash
-git clone <repository-url> # Replace <repository-url> with the actual URL
+# Replace <repository-url> with the actual URL of this repository
+git clone <repository-url> 
 cd Makina
 ```
 
-### Setup & Running
+---
+
+### ⚙️ Setup & Running
 
 There are two main ways to build and run the project:
 
 **1. Using an IDE (Recommended):**
 
-*   Open the `Makina.sln` solution file in your IDE (Visual Studio, Rider, etc.).
-*   Set the `Sandbox` project as the startup project.
-*   Build the solution (usually Ctrl+Shift+B or F6).
-*   Run the `Sandbox` project (usually F5).
+*   Open the **`Makina.sln`** solution file in your IDE.
+*   Set the **`Sandbox`** project as the startup project.
+*   Build the solution (Common shortcuts: `Ctrl+Shift+B` or `F6`).
+*   Run/Debug the **`Sandbox`** project (Common shortcut: `F5`).
 
 **2. Using the .NET CLI:**
 
@@ -35,10 +45,12 @@ There are two main ways to build and run the project:
     ```bash
     cd Sandbox
     ```
-*   Run the project:
+*   Run the project using the .NET CLI:
     ```bash
     dotnet run
     ```
-    This command will automatically restore dependencies, build, and run the `Sandbox` application.
+    *This command will automatically restore dependencies, build the code, and run the `Sandbox` application.*
 
-The Sandbox application demonstrates the current features of the Makina engine.
+---
+
+The **`Sandbox`** application serves as a demonstration area, showcasing the current features and capabilities of the Makina engine.
