@@ -2,6 +2,8 @@
 using NLog;
 using Makina.Engine.Rendering;
 using Makina.Engine.Core.Events;
+using Makina.Engine.Input;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using System;
 
 namespace Makina.Engine;
@@ -46,7 +48,10 @@ public class Application : IDisposable
             // 4. Render the scene
             Render();
             
-            // 5. Swap buffers
+            // 5. Reset per-frame input state
+            InputManager.FrameReset();
+
+            // 6. Swap buffers
             _window.SwapBuffers();
         }
         Log.Info("Exited main loop.");
@@ -128,11 +133,21 @@ public class Application : IDisposable
 
     private void Update()
     { 
-        // This is where game logic updates happen.
-        // Event handlers triggered by DispatchQueuedEvents() might modify state used here.
+        // Example: Check for Escape key press to close window
+        if (InputManager.IsKeyPressed(Keys.Escape))
+        {
+            Log.Info("Escape key pressed, publishing WindowCloseEvent.");
+            EventManager.Publish(new WindowCloseEvent());
+            // Note: The actual closing happens because Window.IsClosing gets set
+            // when the event is published from OnClosing in Window.cs.
+            // This just demonstrates using InputManager.
+        }
         
-        // Example: Check for Escape key press to close window (requires Input system later)
-        // if (Input.IsKeyPressed(Keys.Escape)) { EventManager.Publish(new WindowCloseEvent()); } 
+        // You can also check for continuous key hold:
+        //if (InputManager.IsKeyDown(Keys.W)) { Log.Debug("W key is held down"); }
+        
+        // Check mouse position
+        Log.Trace($"Mouse Position: {InputManager.GetMousePosition()}");
     }
 
     private void Render()

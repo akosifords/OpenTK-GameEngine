@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Makina.Engine")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fb7d06b145b49f064d1e5726c0043ed94ebe0281")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b19d44a2a80341cb69871720360960045ec249f7")]
 [assembly: System.Reflection.AssemblyProductAttribute("Makina.Engine")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Makina.Engine")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

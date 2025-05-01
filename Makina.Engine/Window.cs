@@ -5,6 +5,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework; // Added for IBindingsContext
 using Makina.Engine.Core.Logging; // Added
 using OpenTK.Graphics.OpenGL4; // Added for GL calls
 using Makina.Engine.Core.Events; // Added
+using Makina.Engine.Input; // Added
 using System;
 
 namespace Makina.Engine;
@@ -46,7 +47,13 @@ public class Window : IDisposable
         // Hook up OpenTK events to publish engine events
         _nativeWindow.Resize += OnResize;
         _nativeWindow.Closing += OnClosing;
-        // TODO: Hook up Keyboard/Mouse events here later
+        _nativeWindow.KeyDown += OnKeyDown;
+        _nativeWindow.KeyUp += OnKeyUp;
+        _nativeWindow.MouseDown += OnMouseDown;
+        _nativeWindow.MouseUp += OnMouseUp;
+        _nativeWindow.MouseMove += OnMouseMove;
+        _nativeWindow.MouseWheel += OnMouseWheel;
+        // TODO: Add TextInput event for text input?
     }
 
     public void ProcessEvents()
@@ -87,6 +94,55 @@ public class Window : IDisposable
         
         // We could potentially allow a listener to cancel closing by setting closeEvent.Handled = true
         // if (closeEvent.Handled) { args.Cancel = true; IsClosing = false; }
+    }
+
+    private void OnKeyDown(KeyboardKeyEventArgs args)
+    {
+        // Don't process unknown keys or repeats from OS for KeyDown
+        if (args.IsRepeat || args.Key == Keys.Unknown) return; 
+
+        Log.Trace($"Native KeyDown: {args.Key}");
+        InputManager.SetKeyDown(args.Key);
+        EventManager.Publish(new KeyPressedEvent(args.Key));
+    }
+
+    private void OnKeyUp(KeyboardKeyEventArgs args)
+    {
+        if (args.Key == Keys.Unknown) return; 
+        
+        Log.Trace($"Native KeyUp: {args.Key}");
+        InputManager.SetKeyUp(args.Key);
+        EventManager.Publish(new KeyReleasedEvent(args.Key));
+    }
+
+    private void OnMouseDown(MouseButtonEventArgs args)
+    {
+        Log.Trace($"Native MouseDown: {args.Button}");
+        InputManager.SetMouseButtonDown(args.Button);
+        EventManager.Publish(new MouseButtonPressedEvent(args.Button));
+    }
+
+    private void OnMouseUp(MouseButtonEventArgs args)
+    {
+        Log.Trace($"Native MouseUp: {args.Button}");
+        InputManager.SetMouseButtonUp(args.Button);
+        EventManager.Publish(new MouseButtonReleasedEvent(args.Button));
+    }
+
+    private void OnMouseMove(MouseMoveEventArgs args)
+    {
+        // Log.Trace($"Native MouseMove: ({args.X}, {args.Y})"); // Can be very noisy
+        Vector2 position = new Vector2(args.X, args.Y);
+        InputManager.SetMousePosition(position);
+        EventManager.Publish(new MouseMovedEvent(position));
+    }
+
+    private void OnMouseWheel(MouseWheelEventArgs args)
+    {
+        Log.Trace($"Native MouseWheel: ({args.OffsetX}, {args.OffsetY})");
+        Vector2 offset = new Vector2(args.OffsetX, args.OffsetY);
+        InputManager.SetMouseScroll(offset);
+        EventManager.Publish(new MouseScrolledEvent(offset));
     }
 
     public void Dispose()
