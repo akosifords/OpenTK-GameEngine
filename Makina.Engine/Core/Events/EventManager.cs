@@ -1,13 +1,16 @@
 using Makina.Engine.Core.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Makina.Engine.Core.Events;
 
 public static class EventManager
 {
-    // Dictionary to hold subscribers. Key is the Event Type, Value is a list of delegates (actions).
+    // Dictionary to hold subscribers. Key is the Event Type, Value is a list of delegates.
     private static readonly Dictionary<Type, List<Delegate>> s_subscribers = new();
+    // Queue to hold events published during a frame.
+    private static readonly Queue<Event> s_eventQueue = new();
 
     /// <summary>
     /// Subscribes a handler to a specific event type.
@@ -57,38 +60,68 @@ public static class EventManager
     }
 
     /// <summary>
-    /// Publishes an event to all subscribed handlers.
+    /// Queues an event to be dispatched later.
     /// </summary>
     /// <typeparam name="TEvent">The type of the event being published.</typeparam>
     /// <param name="eventArgs">The event object containing data.</param>
     public static void Publish<TEvent>(TEvent eventArgs) where TEvent : Event
     {
-        Type eventType = typeof(TEvent);
-        if (s_subscribers.TryGetValue(eventType, out var handlers))
+        // Log.Trace($"Queueing event: {eventArgs}");
+        // NOTE: Consider thread safety if events can be published from multiple threads.
+        // A ConcurrentQueue might be needed, or locking around enqueue/dequeue.
+        s_eventQueue.Enqueue(eventArgs);
+    }
+
+    /// <summary>
+    /// Dispatches all queued events to their respective subscribers.
+    /// Should be called once per frame/update cycle.
+    /// </summary>
+    public static void DispatchQueuedEvents()
+    {
+        // Process events currently in the queue. New events published during dispatch
+        // will be processed in the next cycle.
+        int eventsToProcess = s_eventQueue.Count;
+        if (eventsToProcess == 0) return;
+        
+        // Log.Trace($"Dispatching {eventsToProcess} queued events...");
+
+        for (int i = 0; i < eventsToProcess; i++)
         {
-            // Log.Trace($"Publishing event: {eventArgs}");
-            // Iterate over a copy in case handlers modify the collection during iteration
-            foreach (var handlerDelegate in handlers.ToList()) 
+            Event currentEvent = s_eventQueue.Dequeue();
+            Type eventType = currentEvent.GetType(); // Get the actual runtime type
+
+            if (s_subscribers.TryGetValue(eventType, out var handlers))
             {
-                // Check if the event has already been handled by a previous listener
-                if (eventArgs.Handled)
+                 // Iterate over a copy in case handlers modify the collection during iteration (e.g., unsubscribe)
+                foreach (var handlerDelegate in handlers.ToList()) 
                 {
-                    break; // Stop propagation if handled
-                }
-                
-                // Safely cast and invoke the handler
-                if (handlerDelegate is Action<TEvent> specificHandler)
-                {
+                    // Check if the event has already been handled by a previous listener
+                    if (currentEvent.Handled)
+                    {
+                        // Log.Trace($"Event {currentEvent.GetName()} already handled, skipping remaining listeners.");
+                        break; // Stop propagation if handled
+                    }
+
                     try
                     {
-                        specificHandler(eventArgs);
+                        // Invoke the delegate with the specific event instance
+                        // Note: This relies on the delegate signature matching the event type stored in the dictionary key
+                        // which is enforced by the Subscribe<TEvent> generic constraint.
+                        handlerDelegate.DynamicInvoke(currentEvent);
                     }
                     catch (Exception ex)
                     {
-                        Log.Error(ex, $"Exception in event handler {specificHandler.Method.Name} for event {eventType.Name}");
+                        // Log potential exceptions during DynamicInvoke or within the handler itself
+                        Log.Error(ex, $"Exception during event dispatch for {eventType.Name} with handler {handlerDelegate.Method.Name}");
                     }
                 }
             }
+        }
+        
+        // Check if new events were queued during dispatch (less common, but possible)
+        if (s_eventQueue.Count > 0)
+        {
+            Log.Warn($"{s_eventQueue.Count} events were queued during event dispatch. They will be processed next cycle.");
         }
     }
 } 

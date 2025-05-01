@@ -34,13 +34,19 @@ public class Application : IDisposable
         Log.Info("Entering main loop...");
         while (ShouldRun())
         {
-            // Process window events first
+            // 1. Process native window events (pumps OS messages, triggers OpenTK callbacks like OnResize/OnClosing)
             _window.ProcessEvents(); 
+            
+            // 2. Dispatch queued engine events (allows systems to react to events published in step 1 or previous frame)
+            EventManager.DispatchQueuedEvents();
 
+            // 3. Update application logic / game state
             Update();
+            
+            // 4. Render the scene
             Render();
             
-            // Swap buffers at the end of the frame
+            // 5. Swap buffers
             _window.SwapBuffers();
         }
         Log.Info("Exited main loop.");
@@ -122,9 +128,11 @@ public class Application : IDisposable
 
     private void Update()
     { 
-        // Update game state, handle input, run physics, etc.
+        // This is where game logic updates happen.
+        // Event handlers triggered by DispatchQueuedEvents() might modify state used here.
+        
         // Example: Check for Escape key press to close window (requires Input system later)
-        // if (Input.IsKeyPressed(Keys.Escape)) { _window?.Close(); } 
+        // if (Input.IsKeyPressed(Keys.Escape)) { EventManager.Publish(new WindowCloseEvent()); } 
     }
 
     private void Render()
