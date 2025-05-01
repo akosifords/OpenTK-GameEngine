@@ -5,7 +5,7 @@ using System.Linq;
 using Makina.Engine.Scene.Components;
 using Makina.Engine.Core.Logging;
 
-namespace Makina.Engine.Scene;
+namespace Makina.Engine.Scene.Components;
 
 /// <summary>
 /// Represents the position, rotation, and scale of a GameObject in 3D space,
