@@ -13,6 +13,8 @@ using Makina.Engine.Core.Math; // Added
 using Makina.Engine.Rendering.Buffers; // Keep for VertexBufferLayout
 using Makina.Engine.Scene; // Added
 using System.Collections.Generic; // Added for List
+using Makina.Engine.Debugging; // Added
+using ImGuiNET; // Added
 
 namespace Makina.Engine;
 
@@ -20,6 +22,7 @@ public class Application : IDisposable
 {
     private Window? _window;
     private PerspectiveCamera? _camera;
+    private ImGuiController? _imGuiController; // Added ImGui Controller
     
     // Scene Management (very basic)
     private List<GameObject> _gameObjects = new List<GameObject>();
@@ -27,6 +30,7 @@ public class Application : IDisposable
     // Timing
     private readonly Stopwatch _timer = new Stopwatch();
     private float _lastFrameTime = 0.0f;
+    private float _fps = 0.0f; // Added FPS counter
 
     public Application()
     {
@@ -41,9 +45,9 @@ public class Application : IDisposable
         
         // Ensure window, camera, and rendering resources were created
         // Check _triangleMesh for now, since we are using Mesh now
-        if (_window == null || _camera == null)
+        if (_window == null || _camera == null || _imGuiController == null)
         {
-            Log.Error("Window or Camera failed to initialize.");
+            Log.Error("Window, Camera or ImGuiController failed to initialize.");
             return;
         }
         
@@ -61,24 +65,30 @@ public class Application : IDisposable
             float currentTime = (float)_timer.Elapsed.TotalSeconds;
             float deltaTime = currentTime - _lastFrameTime;
             _lastFrameTime = currentTime;
-            // Log.Trace($"DeltaTime: {deltaTime * 1000:F2}ms"); // Can be noisy
+            _fps = 1.0f / deltaTime; // Simple FPS calculation
 
             // 1. Process native window events
             _window.ProcessEvents(); 
             
-            // 2. Dispatch queued engine events
+            // 2. Update ImGui Controller (Input, New Frame)
+            _imGuiController.Update(_window.GetNativeWindow(), deltaTime); // Pass native window
+            
+            // 3. Dispatch queued engine events
             EventManager.DispatchQueuedEvents();
 
-            // 3. Update application logic
+            // 4. Update application logic (incl. ImGui UI building)
             Update(deltaTime);
-            
-            // 4. Render the scene
-            Render();
             
             // 5. Reset per-frame input state (and calculate mouse delta)
             InputManager.FrameReset();
 
-            // 6. Swap buffers
+            // 6. Render the scene
+            Render();
+            
+            // 7. Render ImGui UI
+            _imGuiController.Render();
+
+            // 8. Swap buffers
             _window.SwapBuffers();
         }
         Log.Info("Exited main loop.");
@@ -106,11 +116,15 @@ public class Application : IDisposable
             Renderer.Init(); 
             Log.Info("Renderer initialized.");
 
+            // --- Initialize ImGui Controller ---
+            _imGuiController = new ImGuiController(_window.Size.X, _window.Size.Y);
+            Log.Info("ImGui Controller initialized.");
+
             // --- Create Game Object --- 
             Log.Info("Creating game objects...");
 
             // 1. Load shared resources
-            var shader = new Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
+            var shader = new Makina.Engine.Rendering.Shader("Assets/Shaders/basic.vert", "Assets/Shaders/basic.frag");
             var texture = new Texture("Assets/Textures/container.png");
             float[] vertices = { 0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  0.5f, 1.0f, -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f, 0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f };
             uint[] indices = { 0, 1, 2 };
@@ -140,7 +154,12 @@ public class Application : IDisposable
             
             // --- End Game Object Setup ---
 
+            // Subscribe AFTER all essential systems are created
             EventManager.Subscribe<WindowResizeEvent>(OnWindowResize);
+            if (_window != null)
+            {
+                 _window.TextInput += OnTextInput; // Subscribe to C# event from Window
+            }
             Log.Info("Core systems initialized.");
         }
         catch (Exception ex)
@@ -151,21 +170,25 @@ public class Application : IDisposable
             _window = null; // Ensure window is null so Run() exits
             _camera = null; // Ensure camera is also nulled on error
             _gameObjects.Clear(); // Clear potentially partially created objects
+            _imGuiController = null; // Null out controller
         }
     }
 
     private void SubscribeToEvents()
     {
-        // Example: Application subscribing to the window close event
         EventManager.Subscribe<WindowCloseEvent>(OnWindowClose); 
-        EventManager.Subscribe<WindowResizeEvent>(OnWindowResize);
+        // EventManager.Subscribe<WindowResizeEvent>(OnWindowResize); // Now handled in Initialize
         Log.Trace("Application subscribed to events.");
     }
     
     private void UnsubscribeFromEvents()
     {
         EventManager.Unsubscribe<WindowCloseEvent>(OnWindowClose);
-        EventManager.Unsubscribe<WindowResizeEvent>(OnWindowResize); // Ensure Renderer also unsubscribes if needed
+        // EventManager.Unsubscribe<WindowResizeEvent>(OnWindowResize); // Now handled in Initialize
+        if (_window != null) 
+        {
+            _window.TextInput -= OnTextInput; // Unsubscribe from C# event
+        }
         Log.Trace("Application unsubscribed from events.");
     }
 
@@ -186,6 +209,16 @@ public class Application : IDisposable
             _camera.AspectRatio = (float)e.Width / e.Height;
         }
         // Viewport is handled in Window.cs
+        if (_imGuiController != null) 
+        {
+             _imGuiController.WindowResized(e.Width, e.Height);
+        }
+    }
+
+    // Handler for the C# TextInput event from Window
+    private void OnTextInput(TextInputEventArgs args)
+    {
+        _imGuiController?.PressChar((char)args.Unicode);
     }
 
     private bool ShouldRun()
@@ -196,7 +229,30 @@ public class Application : IDisposable
 
     private void Update(float deltaTime)
     { 
-        if (_camera == null || _window == null) return;
+        // --- Build ImGui UI --- 
+        BuildDebugUI();
+        
+        // Only process camera/game input if ImGui doesn't want capture
+        ImGuiIOPtr io = ImGui.GetIO();
+        if (!io.WantCaptureKeyboard || !io.WantCaptureMouse)
+        {
+             if (_camera != null && _window != null)
+             {
+                  // Camera Controls 
+                  if (InputManager.IsKeyDown(Keys.W)) _camera.ProcessKeyboard(Keys.W, deltaTime);
+                  if (InputManager.IsKeyDown(Keys.S)) _camera.ProcessKeyboard(Keys.S, deltaTime);
+                  if (InputManager.IsKeyDown(Keys.A)) _camera.ProcessKeyboard(Keys.A, deltaTime);
+                  if (InputManager.IsKeyDown(Keys.D)) _camera.ProcessKeyboard(Keys.D, deltaTime);
+
+                  // Mouse Look (only if cursor is grabbed)
+                  if (_window.CursorState == CursorState.Grabbed)
+                  {
+                       Vector2 mouseDelta = InputManager.GetMousePositionDelta();
+                       if (mouseDelta.LengthSquared > 0.0001f) 
+                           _camera.ProcessMouseMovement(mouseDelta.X, mouseDelta.Y);
+                  }
+             }
+        }
         
         // --- Update GameObjects ---
         // Example: Rotate the first game object
@@ -207,21 +263,40 @@ public class Application : IDisposable
             triangleObject.Transform.EulerAngles = new Vector3(0, angle, 0); // Use EulerAngles setter
         }
         
-        // --- Camera Controls ---
-        if (InputManager.IsKeyDown(Keys.W)) _camera.ProcessKeyboard(Keys.W, deltaTime);
-        if (InputManager.IsKeyDown(Keys.S)) _camera.ProcessKeyboard(Keys.S, deltaTime);
-        if (InputManager.IsKeyDown(Keys.A)) _camera.ProcessKeyboard(Keys.A, deltaTime);
-        if (InputManager.IsKeyDown(Keys.D)) _camera.ProcessKeyboard(Keys.D, deltaTime);
-        Vector2 mouseDelta = InputManager.GetMousePositionDelta();
-        if (mouseDelta.LengthSquared > 0.0001f) 
-        {
-             _camera.ProcessMouseMovement(mouseDelta.X, mouseDelta.Y);
-        }
+        // --- Input Handling Example ---
         if (InputManager.IsKeyPressed(Keys.Escape))
         {
              _window.CursorState = _window.CursorState == CursorState.Grabbed ? CursorState.Normal : CursorState.Grabbed;
              Log.Info($"Toggled cursor state to: {_window.CursorState}");
         }
+    }
+
+    private void BuildDebugUI()
+    {
+        // Potentially use ImGui Docking space here
+        // ImGui.DockSpaceOverViewport(ImGui.GetMainViewport());
+        
+        ImGui.Begin("Debug Info"); // Create a window
+        
+        ImGui.Text($"FPS: {_fps:F1}");
+        ImGui.Separator();
+        
+        if (ImGui.CollapsingHeader("GameObjects"))
+        {
+            foreach (var go in _gameObjects)
+            {
+                ImGui.Text($"- {go.Name}");
+                // TODO: Add more details? (Position, etc.)
+                // ImGui.SameLine(); ImGui.Text($" Pos: {go.Transform.Position}"); 
+            }
+        }
+        
+        // Add more debug sections as needed (Camera info, Renderer stats, etc.)
+
+        ImGui.End(); // End the window
+        
+        // Example: Show ImGui Demo Window
+        // ImGui.ShowDemoWindow(); 
     }
 
     private void Render()
@@ -258,6 +333,8 @@ public class Application : IDisposable
     private void Shutdown()
     { 
         Log.Info("Shutting down subsystems and disposing resources...");
+        
+        _imGuiController?.Dispose(); // Dispose ImGui Controller
         
         // Dispose resources held by GameObjects (assuming they are owned here for now)
         // In a real scenario, resource management would be more sophisticated.

@@ -62,6 +62,34 @@ public class Texture : IDisposable
         Unbind(); // Unbind after configuration
     }
 
+    /// <summary>
+    /// Creates a texture directly from pixel data in memory.
+    /// Used primarily for ImGui font atlas.
+    /// </summary>
+    public Texture(string internalName, int width, int height, IntPtr data)
+    {
+        Width = width;
+        Height = height;
+
+        Handle = GL.GenTexture();
+        Bind();
+
+        // Use Rgba8 internal format, expect RGBA input data
+        GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba8,
+                      Width, Height, 0,
+                      PixelFormat.Rgba, PixelType.UnsignedByte, data);
+
+        // Set basic parameters suitable for UI/font rendering
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+
+        Log.Trace($"Created texture '{internalName}' from data (Handle: {Handle}, {Width}x{Height})");
+
+        Unbind();
+    }
+
     public void Bind(TextureUnit unit = TextureUnit.Texture0)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(Texture));

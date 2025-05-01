@@ -60,7 +60,7 @@ public class Window : IDisposable
         _nativeWindow.MouseUp += OnMouseUp;
         _nativeWindow.MouseMove += OnMouseMove;
         _nativeWindow.MouseWheel += OnMouseWheel;
-        // TODO: Add TextInput event for text input?
+        _nativeWindow.TextInput += OnTextInput; // Added TextInput event hook
     }
 
     public void ProcessEvents()
@@ -151,6 +151,25 @@ public class Window : IDisposable
         InputManager.SetMouseScroll(offset);
         EventManager.Publish(new MouseScrolledEvent(offset));
     }
+
+    // Event publisher for TextInput - publish a custom event if needed later,
+    // or directly call controller method.
+    private void OnTextInput(TextInputEventArgs args)
+    {
+        // For now, Application will subscribe directly or handle this.
+        // We could create a custom TextInputEvent if needed.
+        // Log.Trace($"Native TextInput: {(char)args.Unicode}");
+        // EventManager.Publish(new TextInputEvent((char)args.Unicode));
+        
+        // Alternatively, directly raise an event Application subscribes to
+         TextInput?.Invoke(args); // Raise C# event
+    }
+    
+    // C# event for Application to subscribe to
+    public event Action<TextInputEventArgs>? TextInput;
+
+    // Added method to access the underlying GameWindow
+    public GameWindow GetNativeWindow() => _nativeWindow;
 
     public void Dispose()
     {
