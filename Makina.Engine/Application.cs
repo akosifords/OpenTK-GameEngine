@@ -149,16 +149,18 @@ public class Application : IDisposable
             _gameObjects.Add(triangleObject1);
             Log.Info("First game object created with MeshRenderer.");
             
-            // 3. Create Second GameObject (Static Offset)
-            var triangleObject2 = new GameObject("StaticTriangle");
+            // 3. Create Second GameObject (Static Offset, Child of First)
+            var triangleObject2 = new GameObject("ChildTriangle"); // Renamed for clarity
             // Add MeshRenderer component, reusing the same resources
             var meshRenderer2 = new MeshRenderer { Mesh = mesh, Texture = texture, Shader = shader };
             triangleObject2.AddComponent(meshRenderer2);
-            // Modify Transform (already exists on GameObject)
-            triangleObject2.Transform.Position = new Vector3(1.5f, 0.0f, 0.0f); 
-            triangleObject2.Transform.Scale = new Vector3(0.75f); 
+            // Set local transform relative to parent
+            triangleObject2.Transform.LocalPosition = new Vector3(1.5f, 0.0f, 0.0f); // Offset from parent
+            triangleObject2.Transform.LocalScale = new Vector3(0.5f); // Smaller than parent
+            // --- Set Parent --- 
+            triangleObject2.Transform.SetParent(triangleObject1.Transform); // Make it a child
             _gameObjects.Add(triangleObject2);
-            Log.Info("Second game object created with MeshRenderer at offset.");
+            Log.Info("Second game object created as child of the first.");
 
             // 4. Create Directional Light GameObject
             var lightObject = new GameObject("DirectionalLightSource");
@@ -171,7 +173,7 @@ public class Application : IDisposable
             // Set rotation so its Forward vector matches our desired light direction (0.5, -1.0, -0.5) normalized
             // This requires figuring out the Euler angles or Quaternion for that direction. 
             // Let's approximate with Euler angles for simplicity. Pointing down-right-ish.
-            lightObject.Transform.EulerAngles = new Vector3(45.0f, -30.0f, 0.0f); 
+            lightObject.Transform.LocalEulerAngles = new Vector3(45.0f, -30.0f, 0.0f); 
             _gameObjects.Add(lightObject);
             Log.Info("Directional light game object created.");
             
@@ -278,12 +280,16 @@ public class Application : IDisposable
         }
         
         // --- Update GameObjects ---
-        // Example: Rotate the first game object
+        // Example: Rotate the first game object (which is now the parent)
         if (_gameObjects.Count > 0)
         {
-            var triangleObject = _gameObjects[0];
-            float angle = (float)_timer.Elapsed.TotalSeconds * 30.0f; // degrees per second
-            triangleObject.Transform.EulerAngles = new Vector3(0, angle, 0); // Use EulerAngles setter
+            // Find the parent triangle (assuming it's the first one for this example)
+            var parentTriangle = _gameObjects.FirstOrDefault(go => go.Name == "RotatingTriangle"); 
+            if (parentTriangle != null)
+            {
+                float angle = (float)_timer.Elapsed.TotalSeconds * 30.0f; // degrees per second
+                parentTriangle.Transform.LocalEulerAngles = new Vector3(0, angle, 0); // Set local rotation
+            }
         }
         
         // --- Input Handling Example ---
@@ -311,26 +317,38 @@ public class Application : IDisposable
                 if (ImGui.TreeNodeEx($"{go.Name}##{go.GetHashCode()}", ImGuiTreeNodeFlags.DefaultOpen)) // Use TreeNodeEx for better control and unique ID
                 {
                     ImGui.TextDisabled($" Active: {go.IsActive}"); // Show active state
+                    // Optionally show parent name
+                    string parentName = go.Transform.Parent?.GameObject?.Name ?? "None";
+                    ImGui.TextDisabled($" Parent: {parentName}");
                     ImGui.Separator();
                     ImGui.Text("Components:");
                     ImGui.Indent(); // Indent component list
                     foreach (var component in go.GetAllComponents())
                     {
                         ImGui.Text($"- {component.GetType().Name}");
-                        // Optional: Add specific component details here later
-                        // if (component is MeshRenderer mr) { ... }
-
-                        // Display Transform details
+                        
+                        // Display Transform world details
                         if (component is Transform transform)
                         {
                             ImGui.Indent();
-                            // Use a smaller font or tighter spacing if needed
-                            // ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new System.Numerics.Vector2(4, 1)); 
-                            ImGui.Text($"  Pos: {transform.Position}");
-                            ImGui.Text($"  Rot: {transform.EulerAngles}"); // Display Euler angles
-                            ImGui.Text($"  Scl: {transform.Scale}");
-                            // ImGui.PopStyleVar();
+                            ImGui.Text($"  World Pos: {transform.Position:F2}"); // Use world Position getter
+                            ImGui.Text($"  World Rot: {transform.EulerAngles:F1}"); // Use world EulerAngles getter
+                            ImGui.Text($"  World Scl: {transform.LossyScale:F2}"); // Use world LossyScale getter
+                            ImGui.Separator();
+                            // Optionally show local transform too for debugging
+                            ImGui.Text($"  Local Pos: {transform.LocalPosition:F2}");
+                            ImGui.Text($"  Local Rot: {transform.LocalEulerAngles:F1}");
+                            ImGui.Text($"  Local Scl: {transform.LocalScale:F2}");
                             ImGui.Unindent();
+                        }
+                        
+                        // Display Directional Light details
+                        if (component is DirectionalLight light)
+                        {
+                             ImGui.Indent();
+                             ImGui.Text($"  Color: {light.Color}");
+                             ImGui.Text($"  Intensity: {light.Intensity:F2}");
+                             ImGui.Unindent();
                         }
                     }
                     ImGui.Unindent(); // Unindent component list
@@ -411,7 +429,7 @@ public class Application : IDisposable
                 }
                 
                 // Set Transformation Uniforms (using GameObject's Transform)
-                renderer.Shader.SetUniformMat4("uModel", gameObject.Transform.GetLocalMatrix());
+                renderer.Shader.SetUniformMat4("uModel", gameObject.Transform.GetWorldMatrix());
                 renderer.Shader.SetUniformMat4("uView", _camera.ViewMatrix);
                 renderer.Shader.SetUniformMat4("uProjection", _camera.ProjectionMatrix);
                 
